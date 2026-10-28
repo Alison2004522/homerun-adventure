@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>《全壘打大作戰》（Home Run Adventure）</title>
+  <meta name="description" content="結合棒球知識、物理概念與策略闖關的教育遊戲 - 全壘打大作戰">
+  <link rel="icon" type="image/svg+xml" href="assets/images/baseball.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- 遊戲主容器（16:9 比例） -->
+  <div id="game-wrapper">
+
+    <!-- 頂部資訊 HUD -->
+    <header id="top-hud">
+      <div class="hud-group">
+        <div class="hud-badge">
+          <span>關卡：</span>
+          <span id="hud-level-num" class="level-number">1／3</span>
+          <span id="hud-level-name">新手練習場</span>
+        </div>
+      </div>
+
+      <div class="hud-group">
+        <div class="hud-badge">
+          <span>剩餘機會：</span>
+          <div id="hud-chances" class="chances-container">
+            <!-- 棒球機會由 JS 動態渲染 -->
+          </div>
+        </div>
+        <button id="sound-toggle-btn" class="icon-btn" title="開關音效" aria-label="開關音效">
+          <span id="sound-icon">🔊</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- 關卡提示橫幅浮條 -->
+    <div id="level-banner">第一座球場的全壘打牆比較低，試著調整角度與力道，擊出你的第一支全壘打吧！</div>
+
+    <!-- 揮棒失敗非阻塞短暫提示浮動氣泡 -->
+    <div id="toast-notice">
+      <span>💡</span>
+      <span id="toast-message">差一點就到圍牆了！試著增加力道，或調整角度！</span>
+    </div>
+
+    <!-- 全壘打巨幅文字動畫 -->
+    <div id="homerun-banner">HOME RUN!</div>
+
+    <!-- Canvas 遊戲主畫面（1280x720 邏輯畫布） -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- 底部操作控制面板 -->
+    <footer id="bottom-controls">
+      <div class="sliders-container">
+        <!-- 擊球角度滑桿 -->
+        <div class="slider-group">
+          <div class="slider-header">
+            <span class="slider-title">⚾ 擊球角度</span>
+            <span id="angle-val" class="slider-val-badge">45°</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label">低角度</span>
+            <input type="range" id="angle-slider" min="15" max="75" step="5" value="45" aria-label="調整擊球角度">
+            <span class="slider-label">高角度</span>
+          </div>
+        </div>
+
+        <!-- 擊球力道滑桿 -->
+        <div class="slider-group">
+          <div class="slider-header">
+            <span class="slider-title">⚡ 擊球力道</span>
+            <span id="power-val" class="slider-val-badge">75%</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label">40%</span>
+            <input type="range" id="power-slider" min="40" max="100" step="5" value="75" aria-label="調整擊球力道">
+            <span class="slider-label">100%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 大型揮棒按鈕 -->
+      <button id="swing-btn" class="swing-btn">
+        <span>⚾ 揮棒！</span>
+      </button>
+    </footer>
+
+    <!-- 首頁畫面（預設顯示） -->
+    <div id="start-screen" class="overlay-screen active">
+      <div class="modal-card">
+        <div class="modal-header-decor">⚾ 🏆 🌟</div>
+        <h1 class="game-title">《全壘打大作戰》</h1>
+        <div class="game-subtitle">Home Run Adventure</div>
+        <p class="modal-description">
+          冠軍賽即將開始！<br><br>
+          想要擊出全壘打，除了力氣，還需要一點策略！<br>
+          不同球場有不同的全壘打牆，你能找到最佳的擊球方式，成功挑戰三座球場嗎？
+        </p>
+        <button id="start-btn" class="primary-btn">開始挑戰！</button>
+      </div>
+    </div>
+
+    <!-- 關卡通關成功彈窗 -->
+    <div id="level-clear-screen" class="overlay-screen">
+      <div class="modal-card">
+        <div class="modal-header-decor">🎉 ⚾ 🎆</div>
+        <h2 id="level-clear-title" class="modal-title">挑戰成功！</h2>
+        <p id="level-clear-msg" class="modal-description">
+          全壘打！漂亮的一擊！你成功越過第一座球場的圍牆！
+        </p>
+        <div class="modal-btn-row">
+          <button id="next-level-btn" class="success-btn">進入下一關 ➔</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 關卡挑戰失敗彈窗（3 次機會用盡） -->
+    <div id="level-fail-screen" class="overlay-screen">
+      <div class="modal-card">
+        <div class="modal-header-decor">⚾ 💦 💭</div>
+        <h2 class="modal-title">挑戰失敗！再試一次！</h2>
+        <p class="modal-description">
+          別灰心！觀察剛才棒球飛行的方向，調整角度與力道，再挑戰一次吧！
+        </p>
+        <div id="level-fail-hint" class="modal-hint-box">
+          💡 提示：差一點就到圍牆了！試著增加力道，或調整角度！
+        </div>
+        <div class="modal-btn-row">
+          <button id="retry-btn" class="primary-btn">重新挑戰本關</button>
+          <button id="fail-home-btn" class="secondary-btn">返回首頁</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 最終冠軍通關畫面 -->
+    <div id="champion-screen" class="overlay-screen">
+      <div class="modal-card">
+        <div class="modal-header-decor">🏆 👑 🌟</div>
+        <h1 class="modal-title">全壘打冠軍！</h1>
+        <p class="modal-description">
+          恭喜你成功征服三座球場！<br><br>
+          不同的全壘打牆，需要不同的擊球策略。<br>
+          透過觀察、嘗試與調整，你成功找到了自己的全壘打祕訣！
+        </p>
+        <div class="modal-btn-row">
+          <button id="champion-restart-btn" class="primary-btn">重新挑戰</button>
+          <button id="champion-home-btn" class="secondary-btn">返回首頁</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

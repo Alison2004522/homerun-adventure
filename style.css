@@ -1,0 +1,653 @@
+/* ==========================================================================
+   《全壘打大作戰》（Home Run Adventure）- 視覺與排版樣式表
+   風格：可愛日系 2D 卡通、明亮清新色調（藍、綠、黃）、立體按鈕
+   ========================================================================== */
+
+:root {
+  --primary-blue: #1e88e5;
+  --primary-blue-dark: #1565c0;
+  --accent-yellow: #fdd835;
+  --accent-yellow-dark: #fbc02d;
+  --grass-green: #43a047;
+  --grass-green-dark: #2e7d32;
+  --dirt-brown: #d7ccc8;
+  --cherry-red: #e53935;
+  --cherry-red-dark: #c62828;
+  --dark-slate: #263238;
+  --card-bg: rgba(255, 255, 255, 0.95);
+  --shadow-drop: 0 8px 24px rgba(0, 0, 0, 0.25);
+  --button-shadow: 0 6px 0 rgba(0, 0, 0, 0.2);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", "Noto Sans TC", Roboto, sans-serif;
+  background: radial-gradient(circle at 50% 30%, #64b5f6, #1565c0);
+  color: var(--dark-slate);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 遊戲主容器：維持 16:9 比例響應式縮放 */
+#game-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 1280px;
+  aspect-ratio: 16 / 9;
+  max-height: 100vh;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  border-radius: 18px;
+  overflow: hidden;
+  background-color: #000;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 頂部資訊 HUD */
+#top-hud {
+  position: absolute;
+  top: 14px;
+  left: 18px;
+  right: 18px;
+  height: 52px;
+  z-index: 20;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+}
+
+.hud-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+.hud-badge {
+  background: rgba(255, 255, 255, 0.95);
+  padding: 8px 18px;
+  border-radius: 26px;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--dark-slate);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 3px solid #ffca28;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hud-badge .level-number {
+  color: var(--primary-blue-dark);
+  font-weight: 900;
+}
+
+.chances-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ball-chance {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #e53935;
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.2);
+  position: relative;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+}
+
+.ball-chance::before,
+.ball-chance::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 10px;
+  border: 2px dashed #e53935;
+  border-radius: 50%;
+}
+.ball-chance::before {
+  left: 2px;
+  border-right: none;
+}
+.ball-chance::after {
+  right: 2px;
+  border-left: none;
+}
+
+.ball-chance.used {
+  opacity: 0.25;
+  filter: grayscale(100%);
+  transform: scale(0.85);
+}
+
+/* 音效開關按鈕 */
+.icon-btn {
+  background: #ffffff;
+  border: 3px solid #ffca28;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.3rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s, background-color 0.2s;
+  pointer-events: auto;
+}
+
+.icon-btn:hover {
+  transform: scale(1.08);
+  background-color: #fff9c4;
+}
+
+.icon-btn:active {
+  transform: scale(0.95);
+}
+
+/* Canvas 繪圖畫布 */
+#game-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #64b5f6;
+}
+
+/* 關卡提示標語浮動條 */
+#level-banner {
+  position: absolute;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  background: rgba(38, 50, 56, 0.85);
+  color: #fff;
+  padding: 8px 24px;
+  border-radius: 20px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  pointer-events: none;
+  max-width: 80%;
+  text-align: center;
+  white-space: nowrap;
+  animation: fadeInDown 0.4s ease-out;
+}
+
+/* 底部操作控制面板 */
+#bottom-controls {
+  position: absolute;
+  bottom: 14px;
+  left: 20px;
+  right: 20px;
+  z-index: 20;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 12px 28px;
+  border-radius: 22px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  border: 3px solid #fff;
+}
+
+.sliders-container {
+  display: flex;
+  flex: 1;
+  gap: 32px;
+  align-items: center;
+}
+
+.slider-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.slider-title {
+  color: #37474f;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.slider-val-badge {
+  background: #e3f2fd;
+  color: var(--primary-blue-dark);
+  padding: 3px 12px;
+  border-radius: 14px;
+  font-size: 1.1rem;
+  font-weight: 900;
+  border: 2px solid #90caf9;
+  min-width: 70px;
+  text-align: center;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.slider-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #78909c;
+  white-space: nowrap;
+}
+
+/* 自定義美化滑桿 */
+input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 12px;
+  border-radius: 8px;
+  background: #cfd8dc;
+  outline: none;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ffca28;
+  border: 4px solid #ffffff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition: transform 0.15s, background-color 0.2s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  background-color: #ffd54f;
+}
+
+input[type="range"]::-webkit-slider-thumb:active {
+  transform: scale(1.25);
+  background-color: #ffb300;
+}
+
+/* 擊球力道專屬彩色能量槽 */
+#power-slider-track {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+/* 大型揮棒按鈕 */
+.swing-btn {
+  background: linear-gradient(180deg, #ff7043 0%, #d84315 100%);
+  color: #ffffff;
+  border: none;
+  padding: 14px 42px;
+  font-size: 1.5rem;
+  font-weight: 900;
+  border-radius: 36px;
+  cursor: pointer;
+  box-shadow: 0 8px 0 #bf360c, 0 12px 20px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  letter-spacing: 2px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.1s ease;
+  white-space: nowrap;
+}
+
+.swing-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 0 #bf360c, 0 16px 24px rgba(0, 0, 0, 0.35);
+  background: linear-gradient(180deg, #ff8a65 0%, #e64a19 100%);
+}
+
+.swing-btn:active:not(:disabled) {
+  transform: translateY(6px);
+  box-shadow: 0 2px 0 #bf360c, 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.swing-btn:disabled {
+  background: #90a4ae;
+  box-shadow: 0 6px 0 #607d8b;
+  cursor: not-allowed;
+  opacity: 0.7;
+  transform: none;
+}
+
+/* 遊戲全螢幕彈窗遮罩 */
+.overlay-screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(13, 71, 161, 0.75);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease-out;
+}
+
+.overlay-screen.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 卡片視窗風格 */
+.modal-card {
+  background: #ffffff;
+  border-radius: 28px;
+  padding: 36px 42px;
+  max-width: 600px;
+  width: 90%;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+  border: 6px solid #ffca28;
+  text-align: center;
+  transform: scale(0.9);
+  transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  overflow: hidden;
+}
+
+.overlay-screen.active .modal-card {
+  transform: scale(1);
+}
+
+.modal-header-decor {
+  font-size: 3.5rem;
+  margin-bottom: 8px;
+  line-height: 1;
+}
+
+.modal-title {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #1a237e;
+  margin-bottom: 14px;
+}
+
+.modal-description {
+  font-size: 1.15rem;
+  line-height: 1.7;
+  color: #455a64;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.modal-hint-box {
+  background: #fff8e1;
+  border: 2px dashed #ffb300;
+  border-radius: 16px;
+  padding: 14px 18px;
+  margin-bottom: 24px;
+  color: #f57f17;
+  font-weight: 700;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.modal-btn-row {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+/* 各種樣式按鈕 */
+.primary-btn {
+  background: linear-gradient(180deg, #ffb300 0%, #ff8f00 100%);
+  color: #263238;
+  border: none;
+  padding: 16px 46px;
+  font-size: 1.35rem;
+  font-weight: 900;
+  border-radius: 36px;
+  cursor: pointer;
+  box-shadow: 0 6px 0 #ff6f00, 0 10px 18px rgba(0, 0, 0, 0.25);
+  transition: all 0.15s ease;
+  letter-spacing: 1px;
+}
+
+.primary-btn:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(180deg, #ffca28 0%, #ffa000 100%);
+  box-shadow: 0 8px 0 #ff6f00, 0 14px 22px rgba(0, 0, 0, 0.3);
+}
+
+.primary-btn:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #ff6f00, 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+.secondary-btn {
+  background: linear-gradient(180deg, #90a4ae 0%, #607d8b 100%);
+  color: #ffffff;
+  border: none;
+  padding: 14px 34px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  border-radius: 36px;
+  cursor: pointer;
+  box-shadow: 0 5px 0 #455a64, 0 8px 14px rgba(0, 0, 0, 0.2);
+  transition: all 0.15s ease;
+}
+
+.secondary-btn:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(180deg, #b0bec5 0%, #78909c 100%);
+  box-shadow: 0 7px 0 #455a64, 0 12px 18px rgba(0, 0, 0, 0.25);
+}
+
+.secondary-btn:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #455a64, 0 3px 6px rgba(0, 0, 0, 0.2);
+}
+
+.success-btn {
+  background: linear-gradient(180deg, #66bb6a 0%, #388e3c 100%);
+  color: #ffffff;
+  border: none;
+  padding: 16px 44px;
+  font-size: 1.35rem;
+  font-weight: 900;
+  border-radius: 36px;
+  cursor: pointer;
+  box-shadow: 0 6px 0 #1b5e20, 0 10px 18px rgba(0, 0, 0, 0.25);
+  transition: all 0.15s ease;
+}
+
+.success-btn:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(180deg, #81c784 0%, #43a047 100%);
+}
+
+.success-btn:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #1b5e20, 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* 首頁專屬標題卡片 */
+#start-screen .modal-card {
+  max-width: 660px;
+  background: linear-gradient(180deg, #ffffff 0%, #e8f5e9 100%);
+  border: 7px solid #4caf50;
+}
+
+.game-title {
+  font-size: 2.8rem;
+  font-weight: 900;
+  color: #d84315;
+  text-shadow: 2px 2px 0 #ffe082, 4px 4px 0 #37474f;
+  margin-bottom: 6px;
+  letter-spacing: 2px;
+}
+
+.game-subtitle {
+  font-size: 1.25rem;
+  color: #1565c0;
+  font-weight: 800;
+  margin-bottom: 20px;
+  letter-spacing: 1px;
+}
+
+/* 單次揮棒失敗短暫氣泡提示（非阻塞） */
+#toast-notice {
+  position: absolute;
+  top: 140px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  z-index: 30;
+  background: #ffffff;
+  color: #d84315;
+  border: 3px solid #ff7043;
+  padding: 12px 28px;
+  border-radius: 30px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+}
+
+#toast-notice.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* 巨幅全壘打大字特效 */
+#homerun-banner {
+  position: absolute;
+  top: 36%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.5);
+  font-size: 5rem;
+  font-weight: 900;
+  font-style: italic;
+  color: #fff176;
+  text-shadow: 4px 4px 0 #f57f17, 8px 8px 0 #b71c1c, 0 0 30px rgba(255, 235, 59, 0.8);
+  pointer-events: none;
+  z-index: 25;
+  opacity: 0;
+  transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s ease;
+  white-space: nowrap;
+}
+
+#homerun-banner.active {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1.15);
+  animation: pulseHomeRun 1.2s infinite alternate ease-in-out;
+}
+
+@keyframes pulseHomeRun {
+  0% { transform: translate(-50%, -50%) scale(1.1); }
+  100% { transform: translate(-50%, -50%) scale(1.25); }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* 響應式優化（針對平板與手機直橫切換） */
+@media (max-width: 900px) {
+  #bottom-controls {
+    padding: 8px 16px;
+    gap: 12px;
+  }
+  .sliders-container {
+    gap: 14px;
+  }
+  .swing-btn {
+    padding: 10px 24px;
+    font-size: 1.2rem;
+  }
+  .slider-val-badge {
+    font-size: 0.95rem;
+    padding: 2px 8px;
+    min-width: 55px;
+  }
+  .game-title {
+    font-size: 2.2rem;
+  }
+  #homerun-banner {
+    font-size: 3.5rem;
+  }
+}
+
+@media (max-width: 600px) {
+  #game-wrapper {
+    border-radius: 0;
+    height: 100vh;
+  }
+  #bottom-controls {
+    flex-direction: column;
+    padding: 8px 12px;
+    bottom: 6px;
+    left: 8px;
+    right: 8px;
+  }
+  .sliders-container {
+    width: 100%;
+  }
+  .swing-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .modal-card {
+    padding: 24px 20px;
+  }
+}
