@@ -3,155 +3,385 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>《全壘打大作戰》（Home Run Adventure）</title>
-  <meta name="description" content="結合棒球知識、物理概念與策略闖關的教育遊戲 - 全壘打大作戰">
-  <link rel="icon" type="image/svg+xml" href="assets/images/baseball.svg">
+  <title>《喵喵情緒偵探》Cat Detective ． 貓咪肢體語言觀察推理教育遊戲</title>
+  <meta name="description" content="結合閱讀理解、觀察推理與生活應用的貓咪情緒判讀互動教育遊戲。透過觀察耳朵、尾巴、眼睛與姿勢，讀懂貓咪的真正心情！">
+  <link rel="icon" type="image/svg+xml" href="assets/images/detective-cat.svg">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <!-- 遊戲主容器（16:9 比例） -->
-  <div id="game-wrapper">
+  <!-- 主遊戲視窗（支援 16:9 比例與響應式自適應） -->
+  <main id="game-app" role="main">
 
-    <!-- 頂部資訊 HUD -->
-    <header id="top-hud">
-      <div class="hud-group">
-        <div class="hud-badge">
-          <span>關卡：</span>
-          <span id="hud-level-num" class="level-number">1／3</span>
-          <span id="hud-level-name">新手練習場</span>
+    <!-- 頂部導航 HUD 資訊列 -->
+    <header id="game-hud" class="hud-container" aria-label="案件進度與控制列">
+      <div class="hud-left">
+        <div class="case-badge">
+          <span class="badge-icon">🔍</span>
+          <span id="hud-case-badge-text">案件一（1／3）</span>
         </div>
+        <div class="case-title-tag" id="hud-case-name">活力橘貓的邀請</div>
       </div>
 
-      <div class="hud-group">
-        <div class="hud-badge">
-          <span>剩餘機會：</span>
-          <div id="hud-chances" class="chances-container">
-            <!-- 棒球機會由 JS 動態渲染 -->
-          </div>
+      <div class="hud-right">
+        <!-- 線索蒐集計數器 -->
+        <div class="clue-counter-badge" id="clue-counter-badge" title="已蒐集的身體線索數量">
+          <span class="counter-icon">🐾</span>
+          <span class="counter-label">線索：</span>
+          <span id="clue-count-num" class="counter-val">0</span>
+          <span class="counter-total">／</span>
+          <span id="clue-total-num" class="counter-val">3</span>
         </div>
-        <button id="sound-toggle-btn" class="icon-btn" title="開關音效" aria-label="開關音效">
-          <span id="sound-icon">🔊</span>
+
+        <!-- 音效切換按鈕 -->
+        <button id="btn-sound-toggle" class="hud-btn" type="button" aria-label="開關遊戲音效" title="開關音效">
+          <span id="sound-icon" class="hud-btn-icon">🔊</span>
+          <span id="sound-status-text" class="sound-text">音效</span>
         </button>
       </div>
     </header>
 
-    <!-- 關卡提示橫幅浮條 -->
-    <div id="level-banner">第一座球場的全壘打牆比較低，試著調整角度與力道，擊出你的第一支全壘打吧！</div>
+    <!-- 遊戲主要活動畫布／場景容器 -->
+    <section id="game-stage" class="stage-container" aria-label="貓咪觀察舞台">
+      
+      <!-- 動態背景環境裝飾（客廳／紙箱角落／走廊驚擾區） -->
+      <div id="scene-background" class="scene-bg scene-case-1">
+        <div class="bg-room-element bg-window">
+          <div class="sunbeam"></div>
+        </div>
+        <div class="bg-room-element bg-cat-tree"></div>
+        <div class="bg-room-element bg-rug"></div>
+        <div class="bg-decor-paws">
+          <span class="floating-paw p1">🐾</span>
+          <span class="floating-paw p2">🐾</span>
+          <span class="floating-paw p3">🐾</span>
+        </div>
+      </div>
 
-    <!-- 揮棒失敗非阻塞短暫提示浮動氣泡 -->
-    <div id="toast-notice">
-      <span>💡</span>
-      <span id="toast-message">差一點就到圍牆了！試著增加力道，或調整角度！</span>
-    </div>
+      <!-- 案件故事引言橫幅提示條 -->
+      <div id="case-story-banner" class="case-banner">
+        <div class="banner-avatar">🐱</div>
+        <div class="banner-content">
+          <span class="banner-title" id="banner-case-title">委託案件</span>
+          <span class="banner-desc" id="banner-case-desc">這隻橘貓一直盯著我看，尾巴豎得高高的，牠到底在想什麼呢？</span>
+        </div>
+      </div>
 
-    <!-- 全壘打巨幅文字動畫 -->
-    <div id="homerun-banner">HOME RUN!</div>
-
-    <!-- Canvas 遊戲主畫面（1280x720 邏輯畫布） -->
-    <canvas id="game-canvas"></canvas>
-
-    <!-- 底部操作控制面板 -->
-    <footer id="bottom-controls">
-      <div class="sliders-container">
-        <!-- 擊球角度滑桿 -->
-        <div class="slider-group">
-          <div class="slider-header">
-            <span class="slider-title">⚾ 擊球角度</span>
-            <span id="angle-val" class="slider-val-badge">45°</span>
-          </div>
-          <div class="slider-row">
-            <span class="slider-label">低角度</span>
-            <input type="range" id="angle-slider" min="15" max="75" step="5" value="45" aria-label="調整擊球角度">
-            <span class="slider-label">高角度</span>
-          </div>
+      <!-- 貓咪主體互動展示區（SVG 精緻渲染與熱點標記） -->
+      <div id="cat-character-container" class="cat-stage-box">
+        <!-- 貓咪向量 SVG 插畫容器（由 JS 切換關卡貓咪） -->
+        <div id="cat-svg-wrapper" class="cat-svg-wrapper">
+          <!-- SVG 貓咪圖形注入處 -->
         </div>
 
-        <!-- 擊球力道滑桿 -->
-        <div class="slider-group">
-          <div class="slider-header">
-            <span class="slider-title">⚡ 擊球力道</span>
-            <span id="power-val" class="slider-val-badge">75%</span>
+        <!-- 點擊熱點互動錨點層（Hotspots Layer） -->
+        <div id="hotspots-layer" class="hotspots-layer" aria-label="貓咪身體部位觀察點">
+          <!-- 由 JS 動態依關卡產生熱點按鈕 -->
+        </div>
+      </div>
+
+      <!-- 導引微提示浮動氣泡（Idle 提示或提醒） -->
+      <div id="guide-tooltip" class="guide-bubble hidden" role="status" aria-live="polite">
+        <span class="guide-icon">💡</span>
+        <span id="guide-tooltip-text">點擊貓咪發光的身體部位，蒐集重要線索吧！</span>
+      </div>
+
+      <!-- 線索詳情卡片彈出視窗（點擊部位時跳出） -->
+      <div id="clue-popup-card" class="clue-card-overlay hidden" role="dialog" aria-labelledby="clue-card-title" aria-modal="true">
+        <div class="clue-card">
+          <div class="clue-card-header">
+            <span class="clue-card-icon" id="clue-card-part-icon">👂</span>
+            <h3 class="clue-card-title" id="clue-card-part-name">部位名稱</h3>
+            <button id="btn-close-clue" class="card-close-btn" type="button" aria-label="關閉線索卡">✕</button>
           </div>
-          <div class="slider-row">
-            <span class="slider-label">40%</span>
-            <input type="range" id="power-slider" min="40" max="100" step="5" value="75" aria-label="調整擊球力道">
-            <span class="slider-label">100%</span>
+          <div class="clue-card-body">
+            <div class="clue-observation-badge">🔎 觀察到的現象</div>
+            <p class="clue-card-detail" id="clue-card-detail">線索文字內容載入中...</p>
+            <div class="clue-hint-box">
+              <span class="hint-tag">偵探備忘</span>
+              <span class="hint-text" id="clue-card-memo">記得結合其他部位一起綜合推理喔！</span>
+            </div>
+          </div>
+          <div class="clue-card-footer">
+            <button id="btn-confirm-clue" class="clue-confirm-btn" type="button">記在偵探筆記本裡 🐾</button>
           </div>
         </div>
       </div>
 
-      <!-- 大型揮棒按鈕 -->
-      <button id="swing-btn" class="swing-btn">
-        <span>⚾ 揮棒！</span>
-      </button>
+    </section>
+
+    <!-- 底部控制與線索摘要操作面板 -->
+    <footer id="game-control-dock" class="control-dock" aria-label="推理控制區">
+      <div class="dock-inner">
+        <!-- 偵探筆記本線索清單預覽 -->
+        <div class="clues-summary-panel">
+          <div class="panel-header">
+            <span class="panel-icon">📋</span>
+            <span class="panel-title">偵探筆記</span>
+            <span class="panel-count" id="panel-clue-status-text">已蒐集 0 個線索</span>
+          </div>
+          <div id="clues-tag-list" class="clues-tag-list">
+            <!-- 已收集的線索標籤會顯示在此處 -->
+            <div class="clue-empty-hint">請點擊畫面上貓咪身上的發光光圈，獲取身體語言線索！</div>
+          </div>
+        </div>
+
+        <!-- 進入推理判斷主按鈕 -->
+        <div class="action-btn-group">
+          <button id="btn-trigger-deduction" class="main-action-btn pulse-ready" type="button">
+            <span class="btn-sparkle">✨</span>
+            <span class="btn-text">我知道了！開始推理</span>
+          </button>
+        </div>
+      </div>
     </footer>
 
-    <!-- 首頁畫面（預設顯示） -->
-    <div id="start-screen" class="overlay-screen active">
-      <div class="modal-card">
-        <div class="modal-header-decor">⚾ 🏆 🌟</div>
-        <h1 class="game-title">《全壘打大作戰》</h1>
-        <div class="game-subtitle">Home Run Adventure</div>
-        <p class="modal-description">
-          冠軍賽即將開始！<br><br>
-          想要擊出全壘打，除了力氣，還需要一點策略！<br>
-          不同球場有不同的全壘打牆，你能找到最佳的擊球方式，成功挑戰三座球場嗎？
-        </p>
-        <button id="start-btn" class="primary-btn">開始挑戰！</button>
+    <!-- ============================================== -->
+    <!-- 全螢幕模態彈窗層（包含首頁、推理步驟、結算通關） -->
+    <!-- ============================================== -->
+
+    <!-- 1. 開始遊戲首頁畫面（Start Screen） -->
+    <div id="screen-start" class="modal-overlay active-screen" role="dialog" aria-labelledby="start-title" aria-modal="true">
+      <div class="screen-card start-card">
+        <div class="card-decor-header">
+          <span class="decor-item">🔎</span>
+          <span class="decor-item">🐾</span>
+          <span class="decor-item">🐱</span>
+          <span class="decor-item">📝</span>
+          <span class="decor-item">✨</span>
+        </div>
+
+        <h1 id="start-title" class="game-main-title">
+          <span class="title-sub">貓咪肢體語言解謎</span>
+          <span class="title-main">《喵喵情緒偵探》</span>
+        </h1>
+
+        <div class="hero-cat-avatar">
+          <!-- 戴偵探帽的可愛貓咪 SVG 插畫 -->
+          <svg class="detective-cat-hero-svg" viewBox="0 0 200 200" width="160" height="160" aria-hidden="true">
+            <!-- 偵探貓咪 SVG -->
+            <defs>
+              <linearGradient id="heroCatGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#FFB067"/>
+                <stop offset="100%" stop-color="#E27832"/>
+              </linearGradient>
+              <linearGradient id="heroHatGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#8D6E63"/>
+                <stop offset="100%" stop-color="#5D4037"/>
+              </linearGradient>
+            </defs>
+            <!-- 身體 -->
+            <ellipse cx="100" cy="140" rx="60" ry="48" fill="url(#heroCatGrad)"/>
+            <!-- 肚子肚白 -->
+            <ellipse cx="100" cy="148" rx="36" ry="32" fill="#FFF8E7"/>
+            <!-- 頭部 -->
+            <ellipse cx="100" cy="95" rx="52" ry="44" fill="url(#heroCatGrad)"/>
+            <!-- 耳朵 -->
+            <polygon points="62,65 48,22 84,48" fill="#E27832"/>
+            <polygon points="62,62 52,32 78,50" fill="#FFCCBC"/>
+            <polygon points="138,65 152,22 116,48" fill="#E27832"/>
+            <polygon points="138,62 148,32 122,50" fill="#FFCCBC"/>
+            <!-- 偵探小帽子 -->
+            <ellipse cx="100" cy="52" rx="42" ry="12" fill="#4E342E"/>
+            <path d="M68,52 C68,26 132,26 132,52 Z" fill="url(#heroHatGrad)"/>
+            <rect x="68" y="46" width="64" height="6" fill="#D7CCC8"/>
+            <!-- 眼睛 -->
+            <ellipse cx="80" cy="92" rx="9" ry="12" fill="#2E7D32"/>
+            <ellipse cx="120" cy="92" rx="9" ry="12" fill="#2E7D32"/>
+            <ellipse cx="80" cy="92" rx="4" ry="9" fill="#1B5E20"/>
+            <ellipse cx="120" cy="92" rx="4" ry="9" fill="#1B5E20"/>
+            <circle cx="78" cy="88" r="3" fill="#FFFFFF"/>
+            <circle cx="118" cy="88" r="3" fill="#FFFFFF"/>
+            <!-- 鼻子與嘴巴 -->
+            <polygon points="100,104 95,99 105,99" fill="#FF8A80"/>
+            <path d="M95,106 Q100,111 100,105 Q100,111 105,106" fill="none" stroke="#5D4037" stroke-width="2.5" stroke-linecap="round"/>
+            <!-- 鬍鬚 -->
+            <line x1="55" y1="102" x2="30" y2="98" stroke="#5D4037" stroke-width="2"/>
+            <line x1="55" y1="108" x2="32" y2="114" stroke="#5D4037" stroke-width="2"/>
+            <line x1="145" y1="102" x2="170" y2="98" stroke="#5D4037" stroke-width="2"/>
+            <line x1="145" y1="108" x2="168" y2="114" stroke="#5D4037" stroke-width="2"/>
+            <!-- 放大鏡裝飾 -->
+            <g transform="translate(130, 105) rotate(25)">
+              <line x1="0" y1="26" x2="0" y2="55" stroke="#795548" stroke-width="7" stroke-linecap="round"/>
+              <circle cx="0" cy="10" r="18" fill="rgba(179, 229, 252, 0.4)" stroke="#FFB300" stroke-width="5"/>
+              <path d="M-6,4 A12,12 0 0,1 6,4" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/>
+            </g>
+          </svg>
+        </div>
+
+        <div class="card-intro-quote">
+          <p class="quote-text">
+            「貓咪不會說人話，卻會用身體偷偷傳遞訊息！<br>
+            你能觀察牠的耳朵、尾巴、眼睛和姿勢，找出牠真正的心情嗎？<br>
+            一起成為最厲害的喵喵情緒偵探吧！」
+          </p>
+        </div>
+
+        <div class="start-rule-pills">
+          <span class="rule-pill">🎯 觀察 3 大委託案件</span>
+          <span class="rule-pill">🐾 點擊各部位蒐集線索</span>
+          <span class="rule-pill">🧠 綜合推理情緒與適當互動</span>
+        </div>
+
+        <button id="btn-start-game" class="huge-start-btn" type="button">
+          <span class="btn-icon">🚀</span>
+          <span class="btn-label">開始辦案！</span>
+        </button>
       </div>
     </div>
 
-    <!-- 關卡通關成功彈窗 -->
-    <div id="level-clear-screen" class="overlay-screen">
-      <div class="modal-card">
-        <div class="modal-header-decor">🎉 ⚾ 🎆</div>
-        <h2 id="level-clear-title" class="modal-title">挑戰成功！</h2>
-        <p id="level-clear-msg" class="modal-description">
-          全壘打！漂亮的一擊！你成功越過第一座球場的圍牆！
-        </p>
-        <div class="modal-btn-row">
-          <button id="next-level-btn" class="success-btn">進入下一關 ➔</button>
+    <!-- 2. 推理階段一：情緒判斷視窗（Emotion Guess Modal） -->
+    <div id="screen-emotion-guess" class="modal-overlay hidden" role="dialog" aria-labelledby="emotion-guess-title" aria-modal="true">
+      <div class="screen-card deduction-card">
+        <div class="deduction-step-tag">步驟 1／2 ． 貓咪心情推理</div>
+        <h2 id="emotion-guess-title" class="deduction-title">這隻貓咪現在的心情是什麼呢？</h2>
+        <p class="deduction-subtitle">請回顧你所觀察到的身體部位線索，選出最合理的情緒判斷：</p>
+
+        <!-- 當前已收集線索快速回顧列 -->
+        <div class="clue-recap-bar" id="emotion-clue-recap">
+          <!-- JS 動態填入摘要 -->
+        </div>
+
+        <!-- 三選一情緒按鈕清單 -->
+        <div class="options-container" id="emotion-options-group" role="group" aria-label="情緒選項">
+          <!-- 由 JS 動態渲染選項按鈕 -->
+        </div>
+
+        <!-- 答錯時溫暖回饋提示區（不挫折、引導再想） -->
+        <div id="emotion-feedback-box" class="feedback-box hidden" role="alert">
+          <span class="fb-icon">💡</span>
+          <span id="emotion-feedback-text" class="fb-text">再想想看！單看一個部位可能不夠，要把耳朵、尾巴和身體姿勢一起看喔！</span>
+        </div>
+
+        <div class="modal-card-bottom">
+          <button id="btn-back-to-observe-1" class="secondary-btn" type="button">← 返回再次觀察貓咪</button>
         </div>
       </div>
     </div>
 
-    <!-- 關卡挑戰失敗彈窗（3 次機會用盡） -->
-    <div id="level-fail-screen" class="overlay-screen">
-      <div class="modal-card">
-        <div class="modal-header-decor">⚾ 💦 💭</div>
-        <h2 class="modal-title">挑戰失敗！再試一次！</h2>
-        <p class="modal-description">
-          別灰心！觀察剛才棒球飛行的方向，調整角度與力道，再挑戰一次吧！
-        </p>
-        <div id="level-fail-hint" class="modal-hint-box">
-          💡 提示：差一點就到圍牆了！試著增加力道，或調整角度！
+    <!-- 3. 推理階段二：正確互動選擇視窗（Action Guess Modal） -->
+    <div id="screen-action-guess" class="modal-overlay hidden" role="dialog" aria-labelledby="action-guess-title" aria-modal="true">
+      <div class="screen-card deduction-card">
+        <div class="deduction-step-tag success-tag">步驟 2／2 ． 適當應對互動</div>
+        <h2 id="action-guess-title" class="deduction-title">我們現在應該怎麼跟牠互動最好？</h2>
+        <p class="deduction-subtitle">身為貼心的情緒偵探，面對這種心情的貓咪，最恰當的做法是：</p>
+
+        <!-- 正確情緒確認標籤 -->
+        <div class="confirmed-emotion-badge" id="confirmed-emotion-badge">
+          <span>✅ 貓咪情緒：<strong>開心／放鬆／想玩</strong></span>
         </div>
-        <div class="modal-btn-row">
-          <button id="retry-btn" class="primary-btn">重新挑戰本關</button>
-          <button id="fail-home-btn" class="secondary-btn">返回首頁</button>
+
+        <!-- 互動選項按鈕清單 -->
+        <div class="options-container" id="action-options-group" role="group" aria-label="互動方式選項">
+          <!-- 由 JS 動態渲染選項按鈕 -->
+        </div>
+
+        <!-- 互動回饋提示區 -->
+        <div id="action-feedback-box" class="feedback-box hidden" role="alert">
+          <span class="fb-icon">🐾</span>
+          <span id="action-feedback-text" class="fb-text">請選擇最安全且尊重貓咪感受的做法喔！</span>
+        </div>
+
+        <div class="modal-card-bottom">
+          <button id="btn-back-to-observe-2" class="secondary-btn" type="button">← 返回再次觀察貓咪</button>
         </div>
       </div>
     </div>
 
-    <!-- 最終冠軍通關畫面 -->
-    <div id="champion-screen" class="overlay-screen">
-      <div class="modal-card">
-        <div class="modal-header-decor">🏆 👑 🌟</div>
-        <h1 class="modal-title">全壘打冠軍！</h1>
-        <p class="modal-description">
-          恭喜你成功征服三座球場！<br><br>
-          不同的全壘打牆，需要不同的擊球策略。<br>
-          透過觀察、嘗試與調整，你成功找到了自己的全壘打祕訣！
-        </p>
-        <div class="modal-btn-row">
-          <button id="champion-restart-btn" class="primary-btn">重新挑戰</button>
-          <button id="champion-home-btn" class="secondary-btn">返回首頁</button>
+    <!-- 4. 單關破案成功說明視窗（Case Success Modal） -->
+    <div id="screen-case-success" class="modal-overlay hidden" role="dialog" aria-labelledby="case-success-title" aria-modal="true">
+      <div class="screen-card result-card">
+        <div class="result-celebration-icons">🎉 ⭐ 🐾 ⭐ 🏆</div>
+        <h2 id="case-success-title" class="result-title">案件圓滿破解！</h2>
+        <div class="result-case-name" id="success-case-name">案件一：活力橘貓的邀請</div>
+
+        <div class="result-explanation-card">
+          <div class="explanation-section">
+            <h4 class="exp-title">🔎 偵探觀察總結</h4>
+            <p id="success-exp-clues" class="exp-content">耳朵自然豎起朝前、尾巴筆直豎立微彎、身體姿勢輕鬆踏步，瞳孔放鬆。</p>
+          </div>
+          <div class="explanation-section highlight-box">
+            <h4 class="exp-title">💡 專家教育解密</h4>
+            <p id="success-exp-education" class="exp-content">
+              答對了！這隻貓咪放鬆且尾巴直立，表示心情極佳、想互動玩耍。此時拿出逗貓棒等玩具是最好的互動方式！
+            </p>
+          </div>
         </div>
+
+        <button id="btn-next-case" class="huge-start-btn next-btn" type="button">
+          <span class="btn-icon">➡️</span>
+          <span id="btn-next-case-text" class="btn-label">前往下一個案件</span>
+        </button>
       </div>
     </div>
 
-  </div>
+    <!-- 5. 全破通關與結算證書畫面（Game Complete Screen） -->
+    <div id="screen-game-complete" class="modal-overlay hidden" role="dialog" aria-labelledby="complete-title" aria-modal="true">
+      <div class="screen-card certificate-card">
+        
+        <!-- 結算頂部榮譽徽章 -->
+        <div class="certificate-badge-wrap">
+          <div class="detective-medal">
+            <span class="medal-ribbon left"></span>
+            <div class="medal-gold">
+              <span class="medal-icon">🏅</span>
+              <span class="medal-text">特級偵探</span>
+            </div>
+            <span class="medal-ribbon right"></span>
+          </div>
+        </div>
+
+        <h2 id="complete-title" class="certificate-title">你是喵喵情緒偵探！</h2>
+        <div class="certificate-subtitle">★ 貓咪肢體語言大師認證證書 ★</div>
+
+        <p class="certificate-praise">
+          恭喜你成功破解三個貓咪案件！<br>
+          你已經學會從耳朵、眼睛、尾巴和身體姿勢，讀懂貓咪想表達的真正訊息。<br>
+          記得：<strong>觀察貓咪、尊重牠的感受，才能成為牠最貼心的好夥伴！</strong>
+        </p>
+
+        <!-- 三大生活重要觀念卡（呼應文章核心價值） -->
+        <div class="edu-reminders-grid">
+          <div class="edu-item">
+            <div class="edu-item-header">
+              <span class="edu-icon">🏠</span>
+              <strong>給予適應時間</strong>
+            </div>
+            <p class="edu-desc">貓咪到新環境容易緊張害怕，需要安靜的空間與時間，切勿急著強行抱摸。</p>
+          </div>
+
+          <div class="edu-item">
+            <div class="edu-item-header">
+              <span class="edu-icon">🛑</span>
+              <strong>尊重警戒訊號</strong>
+            </div>
+            <p class="edu-desc">當貓咪出現炸毛、背部拱起、劇烈甩尾或露出牙齒時，請立刻停止接觸、保持距離！</p>
+          </div>
+
+          <div class="edu-item">
+            <div class="edu-item-header">
+              <span class="edu-icon">❤️</span>
+              <strong>領養不棄養</strong>
+            </div>
+            <p class="edu-desc">養貓是一輩子的承諾與責任，用愛心理解牠們的身體語言，終生不離不棄。</p>
+          </div>
+        </div>
+
+        <div class="certificate-footer-buttons">
+          <button id="btn-replay-game" class="main-action-btn" type="button">
+            <span class="btn-icon">🔄</span>
+            <span class="btn-text">再玩一次</span>
+          </button>
+          <button id="btn-return-home" class="secondary-btn" type="button">
+            <span class="btn-icon">🏠</span>
+            <span class="btn-text">返回首頁</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
 
   <script src="game.js"></script>
 </body>

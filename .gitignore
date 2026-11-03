@@ -1,0 +1,25 @@
+# 系統與編輯器暫存
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# 依賴與暫存檔
+node_modules/
+dist/
+build/
+*.log
+
+# 環境變數與機敏檔案防護
+.env
+.env.local
+.env.*.local
+*.env
+*.pem
+*.key
+*credentials*.json
+*serviceAccountKey*.json
+
+# 雲端平台暫存
+.vercel/
+.netlify/

@@ -1,20 +1,25 @@
 /**
- * ============================================================================
- * 《全壘打大作戰》（Home Run Adventure）
- * 核心遊戲邏輯、物理引擎、Canvas 2D 渲染與 Web Audio 音效合成模組
- * ============================================================================
+ * 《喵喵情緒偵探》Cat Detective
+ * 貓咪肢體語言觀察推理教育遊戲核心邏輯腳本
+ *
+ * 設計原則：
+ * 1. 純原生 JavaScript（無任何外部相依套件）
+ * 2. 嚴格遵循台灣繁體中文排版與無障礙點擊
+ * 3. 採用 Web Audio API 實現純程式合成音效（保證離線與靜態部署 100% 正常發聲）
+ * 4. 具備完整的案件狀態流轉與容錯教育反饋機制
  */
 
 (function () {
-  "use strict";
+  'use strict';
 
-  /* ==========================================================================
-     一、 音效管理模組（Web Audio API 程序化合成，零外部依賴）
-     ========================================================================== */
-  class SoundManager {
+  // ==========================================================================
+  // 一、 Web Audio API 音效合成引擎
+  // ==========================================================================
+
+  class SoundEffects {
     constructor() {
-      this.ctx = null;
-      this.enabled = true;
+      this.audioCtx = null;
+      this.soundEnabled = true;
       this.initialized = false;
     }
 
@@ -23,1344 +28,1229 @@
       try {
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         if (AudioContextClass) {
-          this.ctx = new AudioContextClass();
+          this.audioCtx = new AudioContextClass();
           this.initialized = true;
         }
-      } catch (e) {
-        console.warn("Web Audio API not supported", e);
+      } catch (err) {
+        console.warn('Web Audio API 初始化略過：', err);
       }
     }
 
     resume() {
-      if (this.ctx && this.ctx.state === "suspended") {
-        this.ctx.resume();
+      if (this.audioCtx && this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume();
       }
     }
 
     toggle() {
-      this.enabled = !this.enabled;
-      return this.enabled;
+      this.soundEnabled = !this.soundEnabled;
+      return this.soundEnabled;
     }
 
-    // 1. 按鈕點擊聲（清脆泡泡音）
+    // 1. 輕快按鈕點擊音（柔和泡泡波）
     playClick() {
-      if (!this.enabled || !this.ctx) return;
+      if (!this.soundEnabled) return;
+      this.init();
       this.resume();
-      const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
+      if (!this.audioCtx) return;
 
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(600, now);
-      osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+      const osc = this.audioCtx.createOscillator();
+      const gain = this.audioCtx.createGain();
 
-      gain.gain.setValueAtTime(0.15, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(480, this.audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(800, this.audioCtx.currentTime + 0.08);
+
+      gain.gain.setValueAtTime(0.12, this.audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, this.audioCtx.currentTime + 0.08);
 
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.audioCtx.destination);
 
-      osc.start(now);
-      osc.stop(now + 0.08);
+      osc.start();
+      osc.stop(this.audioCtx.currentTime + 0.08);
     }
 
-    // 2. 揮棒破空聲（風切聲）
-    playSwing() {
-      if (!this.enabled || !this.ctx) return;
+    // 2. 發現線索音（清脆水晶鈴聲）
+    playClue() {
+      if (!this.soundEnabled) return;
+      this.init();
       this.resume();
-      const now = this.ctx.currentTime;
-      const bufferSize = this.ctx.sampleRate * 0.2;
-      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-      const output = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) {
-        output[i] = Math.random() * 2 - 1;
-      }
+      if (!this.audioCtx) return;
 
-      const whiteNoise = this.ctx.createBufferSource();
-      whiteNoise.buffer = buffer;
+      const now = this.audioCtx.currentTime;
+      const notes = [587.33, 880, 1174.66]; // D5, A5, D6
 
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = "bandpass";
-      filter.frequency.setValueAtTime(400, now);
-      filter.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
-      filter.frequency.exponentialRampToValueAtTime(300, now + 0.2);
-      filter.Q.value = 3.0;
+      notes.forEach((freq, idx) => {
+        const osc = this.audioCtx.createOscillator();
+        const gain = this.audioCtx.createGain();
 
-      const gain = this.ctx.createGain();
-      gain.gain.setValueAtTime(0.01, now);
-      gain.gain.linearRampToValueAtTime(0.3, now + 0.08);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.07);
 
-      whiteNoise.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.ctx.destination);
+        gain.gain.setValueAtTime(0.14, now + idx * 0.07);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.07 + 0.28);
 
-      whiteNoise.start(now);
-      whiteNoise.stop(now + 0.2);
-    }
-
-    // 3. 擊球木棒清脆聲
-    playHit() {
-      if (!this.enabled || !this.ctx) return;
-      this.resume();
-      const now = this.ctx.currentTime;
-
-      // 擊球高頻瞬態沖擊
-      const osc1 = this.ctx.createOscillator();
-      const gain1 = this.ctx.createGain();
-      osc1.type = "triangle";
-      osc1.frequency.setValueAtTime(1200, now);
-      osc1.frequency.exponentialRampToValueAtTime(320, now + 0.12);
-      gain1.gain.setValueAtTime(0.5, now);
-      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-      osc1.connect(gain1);
-      gain1.connect(this.ctx.destination);
-      osc1.start(now);
-      osc1.stop(now + 0.12);
-
-      // 木質共振低音
-      const osc2 = this.ctx.createOscillator();
-      const gain2 = this.ctx.createGain();
-      osc2.type = "sine";
-      osc2.frequency.setValueAtTime(260, now);
-      osc2.frequency.exponentialRampToValueAtTime(90, now + 0.18);
-      gain2.gain.setValueAtTime(0.4, now);
-      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-      osc2.connect(gain2);
-      gain2.connect(this.ctx.destination);
-      osc2.start(now);
-      osc2.stop(now + 0.18);
-    }
-
-    // 4. 擊中全壘打牆撞擊聲
-    playWallHit() {
-      if (!this.enabled || !this.ctx) return;
-      this.resume();
-      const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(160, now);
-      osc.frequency.exponentialRampToValueAtTime(40, now + 0.25);
-      gain.gain.setValueAtTime(0.35, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.25);
-    }
-
-    // 5. 全壘打慶祝歡呼與勝利和弦
-    playHomeRun() {
-      if (!this.enabled || !this.ctx) return;
-      this.resume();
-      const notes = [261.63, 329.63, 392.0, 523.25]; // C4, E4, G4, C5
-      notes.forEach((freq, i) => {
-        const startTime = this.ctx.currentTime + i * 0.12;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(freq, startTime);
-        gain.gain.setValueAtTime(0.25, startTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.45);
         osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(startTime);
-        osc.stop(startTime + 0.45);
+        gain.connect(this.audioCtx.destination);
+
+        osc.start(now + idx * 0.07);
+        osc.stop(now + idx * 0.07 + 0.28);
       });
-
-      // 觀眾歡呼聲（模擬多重噪聲）
-      const bufferSize = this.ctx.sampleRate * 1.8;
-      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
-      }
-      const noise = this.ctx.createBufferSource();
-      noise.buffer = buffer;
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = "bandpass";
-      filter.frequency.setValueAtTime(800, this.ctx.currentTime);
-      filter.Q.value = 1.5;
-
-      const cheerGain = this.ctx.createGain();
-      const cNow = this.ctx.currentTime + 0.2;
-      cheerGain.gain.setValueAtTime(0.01, cNow);
-      cheerGain.gain.linearRampToValueAtTime(0.25, cNow + 0.4);
-      cheerGain.gain.exponentialRampToValueAtTime(0.001, cNow + 1.6);
-
-      noise.connect(filter);
-      filter.connect(cheerGain);
-      cheerGain.connect(this.ctx.destination);
-      noise.start(cNow);
-      noise.stop(cNow + 1.6);
     }
 
-    // 6. 挑戰失敗音效（下行沮喪滑音）
-    playFail() {
-      if (!this.enabled || !this.ctx) return;
+    // 3. 答對成功和弦（清亮愉悅叮咚）
+    playCorrect() {
+      if (!this.soundEnabled) return;
+      this.init();
       this.resume();
-      const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = "sawtooth";
-      osc.frequency.setValueAtTime(330, now);
-      osc.frequency.linearRampToValueAtTime(140, now + 0.5);
-      gain.gain.setValueAtTime(0.2, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.5);
-    }
+      if (!this.audioCtx) return;
 
-    // 7. 最終冠軍盛大慶典和弦
-    playChampion() {
-      if (!this.enabled || !this.ctx) return;
-      this.resume();
-      const melody = [
-        { f: 261.63, d: 0.2 },
-        { f: 261.63, d: 0.2 },
-        { f: 261.63, d: 0.2 },
-        { f: 329.63, d: 0.4 },
-        { f: 392.0, d: 0.3 },
-        { f: 523.25, d: 0.8 },
-      ];
-      let t = this.ctx.currentTime;
-      melody.forEach((note) => {
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(note.f, t);
-        gain.gain.setValueAtTime(0.28, t);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + note.d);
+      const now = this.audioCtx.currentTime;
+      const chord = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+
+      chord.forEach((freq, idx) => {
+        const osc = this.audioCtx.createOscillator();
+        const gain = this.audioCtx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.09);
+
+        gain.gain.setValueAtTime(0.18, now + idx * 0.09);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.09 + 0.45);
+
         osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(t);
-        osc.stop(t + note.d);
-        t += note.d * 0.9;
+        gain.connect(this.audioCtx.destination);
+
+        osc.start(now + idx * 0.09);
+        osc.stop(now + idx * 0.09 + 0.45);
+      });
+    }
+
+    // 4. 提示/答錯柔和音（不挫折低音撫慰提示）
+    playWrong() {
+      if (!this.soundEnabled) return;
+      this.init();
+      this.resume();
+      if (!this.audioCtx) return;
+
+      const now = this.audioCtx.currentTime;
+      const notes = [349.23, 293.66]; // F4, D4
+
+      notes.forEach((freq, idx) => {
+        const osc = this.audioCtx.createOscillator();
+        const gain = this.audioCtx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.12);
+
+        gain.gain.setValueAtTime(0.12, now + idx * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.25);
+
+        osc.connect(gain);
+        gain.connect(this.audioCtx.destination);
+
+        osc.start(now + idx * 0.12);
+        osc.stop(now + idx * 0.12 + 0.25);
+      });
+    }
+
+    // 5. 通關大勝利號角小調
+    playFanfare() {
+      if (!this.soundEnabled) return;
+      this.init();
+      this.resume();
+      if (!this.audioCtx) return;
+
+      const now = this.audioCtx.currentTime;
+      const fanfare = [
+        { f: 523.25, d: 0.14 }, // C5
+        { f: 659.25, d: 0.14 }, // E5
+        { f: 783.99, d: 0.14 }, // G5
+        { f: 1046.5, d: 0.42 }  // C6
+      ];
+
+      let elapsed = 0;
+      fanfare.forEach((note) => {
+        const osc = this.audioCtx.createOscillator();
+        const gain = this.audioCtx.createGain();
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(note.f, now + elapsed);
+
+        gain.gain.setValueAtTime(0.2, now + elapsed);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + elapsed + note.d);
+
+        osc.connect(gain);
+        gain.connect(this.audioCtx.destination);
+
+        osc.start(now + elapsed);
+        osc.stop(now + elapsed + note.d);
+
+        elapsed += note.d * 0.85;
       });
     }
   }
 
-  /* ==========================================================================
-     二、 關卡資料與物理常數設定
-     ========================================================================== */
-  const PHYSICS = {
-    g: 9.8, // 重力加速度 (遊戲單位/秒^2)
-    vScale: 35.5, // 滿力道初速基準 (遊戲單位/秒)
-    y0: 1.2, // 打擊點離地高度 (遊戲單位)
-    ballRadius: 0.5, // 棒球物理半徑 (遊戲單位)
-    originX: 150, // Canvas 打擊點像素 X
-    groundY: 570, // Canvas 地面像素 Y
-    scale: 9.0, // 像素 / 遊戲單位 (1 遊戲單位 = 9.0 像素)
-  };
+  const sounds = new SoundEffects();
 
-  const LEVELS = [
+  // ==========================================================================
+  // 二、 案件資料庫（三關完整內容與科普教育知識庫）
+  // ==========================================================================
+
+  const CASES_DATA = [
     {
       id: 1,
-      name: "新手練習場",
-      difficulty: "簡單",
-      distance: 75,
-      height: 5,
-      tip: "第一座球場的全壘打牆比較低，試著調整角度與力道，擊出你的第一支全壘打吧！",
-      successMsg: "全壘打！漂亮的一擊！你成功越過第一座球場的圍牆！",
-      wallColor: "#43a047",
-      wallTopColor: "#fdd835",
-      skyColor: ["#64b5f6", "#e3f2fd"],
-      flagText: "新手訓練場",
+      badge: '案件一（1／3）',
+      title: '活力橘貓的邀請',
+      sceneClass: 'scene-case-1',
+      description: '客廳裡的橘貓一直盯著我看，尾巴豎得高高的，甚至發出呼嚕聲，牠想表達什麼呢？',
+      catType: 'orange-cat',
+      hotspots: [
+        {
+          id: 'tail',
+          name: '尾巴部位',
+          icon: '🐾',
+          xPercent: 18,
+          yPercent: 44,
+          observation: '尾巴高高豎立，尾端帶點微彎，輕輕搖擺。',
+          meaning: '尾巴直立表示開心、想玩與自信。',
+          memo: '直立的尾巴代表友善與放鬆的心情喔！'
+        },
+        {
+          id: 'ears',
+          name: '耳朵部位',
+          icon: '👂',
+          xPercent: 42,
+          yPercent: 22,
+          observation: '雙耳自然朝前豎起，對聲音好奇專注。',
+          meaning: '耳朵向前傾表示警戒或對周遭感到好奇。',
+          memo: '搭配放鬆的姿勢，表示對眼前事物很感興趣！'
+        },
+        {
+          id: 'eyes',
+          name: '眼睛與眼神',
+          icon: '👀',
+          xPercent: 62,
+          yPercent: 34,
+          observation: '雙眼圓睜溫和，在光線下瞳孔微微放大。',
+          meaning: '瞳孔放大可能放鬆，也可能興奮想玩。',
+          memo: '單看瞳孔不夠，要搭配尾巴與身體綜合判斷！'
+        },
+        {
+          id: 'body',
+          name: '身體與前腳',
+          icon: '🐾',
+          xPercent: 64,
+          yPercent: 74,
+          observation: '身體姿勢放鬆舒展，前腳掌正溫柔踩踏。',
+          meaning: '身體放鬆、輕輕踩踏表示感到安心與信任。',
+          memo: '幼貓時期的踩奶行為，只有在最放鬆時才會出現！'
+        }
+      ],
+      emotionQuestion: {
+        title: '這隻橘貓現在的心情是什麼呢？',
+        options: [
+          {
+            key: 'A',
+            text: '開心／放鬆／想玩',
+            isCorrect: true,
+            hint: '答對了！尾巴直立搭配放鬆舒展的身體，代表牠心情極佳！'
+          },
+          {
+            key: 'B',
+            text: '緊張／害怕',
+            isCorrect: false,
+            hint: '再想想看！害怕的貓咪通常會把尾巴夾起來、身體壓低，但這隻貓咪尾巴高高豎立喔！'
+          },
+          {
+            key: 'C',
+            text: '生氣／警戒',
+            isCorrect: false,
+            hint: '再想想看！生氣時通常會炸毛、背部拱起並劇烈甩尾，這隻貓咪神態很安詳放鬆喔！'
+          }
+        ]
+      },
+      actionQuestion: {
+        title: '身為專業情緒偵探，現在最好的互動方式是？',
+        confirmedText: '開心／放鬆／想玩',
+        options: [
+          {
+            key: 'A',
+            text: '拿出玩具溫和互動，例如用逗貓棒陪牠玩',
+            isCorrect: true,
+            hint: '做得好！當貓咪放鬆又想玩時，用逗貓棒進行適度溫和的互動最能增進感情！'
+          },
+          {
+            key: 'B',
+            text: '突然衝過去用力抱緊牠轉圈圈',
+            isCorrect: false,
+            hint: '太急了喔！即使貓咪心情好，突如其來的粗魯動作還是會嚇到牠！'
+          },
+          {
+            key: 'C',
+            text: '在牠耳邊用力拍手大喊「你好棒」',
+            isCorrect: false,
+            hint: '這樣不行喔！貓咪耳朵非常敏銳，巨大噪音會瞬間引發驚嚇與恐慌！'
+          }
+        ]
+      },
+      summary: {
+        clues: '耳朵自然朝前豎立、尾巴筆直高高豎起、眼神溫和瞳孔微放大、身體放鬆踩踏。',
+        education: '答對了！這隻貓咪雖然瞳孔放大，但搭配尾巴直立、身體放鬆，可以推測牠現在心情極佳、想互動玩耍。此時拿出逗貓棒陪牠玩，是培養默契的最佳時機！'
+      }
     },
     {
       id: 2,
-      name: "巨人高牆",
-      difficulty: "中等",
-      distance: 75,
-      height: 18,
-      tip: "這次的全壘打牆變高了！光是打得遠還不夠，還要讓球飛得夠高！",
-      successMsg: "太厲害了！你成功飛越巨人高牆！",
-      wallColor: "#1b5e20",
-      wallTopColor: "#ffeb3b",
-      skyColor: ["#42a5f5", "#bbdefb"],
-      flagText: "巨人高牆挑戰",
+      badge: '案件二（2／3）',
+      title: '躲在角落的小灰貓',
+      sceneClass: 'scene-case-2',
+      description: '剛到新家的小灰貓躲在房間角落動也不敢動，周遭環境對牠來說很陌生，該怎麼讀懂牠的心情？',
+      catType: 'gray-cat',
+      hotspots: [
+        {
+          id: 'ears',
+          name: '耳朵部位',
+          icon: '👂',
+          xPercent: 38,
+          yPercent: 30,
+          observation: '耳朵朝兩側折平貼在頭頂，形成俗稱的「飛機耳」。',
+          meaning: '耳朵向後折平（飛機耳）表示害怕或受到驚嚇。',
+          memo: '飛機耳代表貓咪感受到威脅或不安！'
+        },
+        {
+          id: 'eyes',
+          name: '眼睛眼神',
+          icon: '👀',
+          xPercent: 60,
+          yPercent: 38,
+          observation: '眼睛睜得很大、瞳孔擴大，驚恐警覺地盯著周圍。',
+          meaning: '瞳孔緊繃放大，眼神警覺，隨時防備危險。',
+          memo: '處於防備狀態，正在評估周圍環境是否安全。'
+        },
+        {
+          id: 'tail',
+          name: '尾巴部位',
+          icon: '🐾',
+          xPercent: 24,
+          yPercent: 68,
+          observation: '尾巴緊緊夾在兩隻後腳之間，縮得小小的。',
+          meaning: '尾巴夾在後腿間表示極度害怕與缺乏安全感。',
+          memo: '把尾巴藏起來是為了保護自己不被攻擊！'
+        },
+        {
+          id: 'posture',
+          name: '身體姿勢',
+          icon: '📦',
+          xPercent: 66,
+          yPercent: 72,
+          observation: '整個身體緊繃壓低，緊緊縮在角落紙箱旁。',
+          meaning: '身體壓低縮成一團，代表極度緊張或試圖隱藏自己。',
+          memo: '新環境容易讓貓咪感到不安，需要時間適應。'
+        }
+      ],
+      emotionQuestion: {
+        title: '這隻小灰貓現在的心情是什麼呢？',
+        options: [
+          {
+            key: 'A',
+            text: '緊張／害怕',
+            isCorrect: true,
+            hint: '觀察得太精準了！飛機耳、夾尾巴、身體壓低，全部指向極度緊張不安！'
+          },
+          {
+            key: 'B',
+            text: '放鬆／想睡覺',
+            isCorrect: false,
+            hint: '不對喔！放鬆的貓咪身體會舒展伸直，不會出現飛機耳與緊繃的姿態！'
+          },
+          {
+            key: 'C',
+            text: '興奮／想抓老鼠',
+            isCorrect: false,
+            hint: '再想想看！興奮想打獵的貓咪尾巴會抽動、眼神專注，而不會把尾巴緊緊夾在兩腳之間！'
+          }
+        ]
+      },
+      actionQuestion: {
+        title: '面對剛到新環境、緊張害怕的小灰貓，最適當的做法是？',
+        confirmedText: '緊張／害怕',
+        options: [
+          {
+            key: 'A',
+            text: '先不要強迫接觸，給牠安靜的時間與空間適應',
+            isCorrect: true,
+            hint: '做得好！貓咪到新環境容易緊張，耐心給牠時間與獨立空間，才是最溫柔的尊重！'
+          },
+          {
+            key: 'B',
+            text: '強行把牠從角落拖出來抱在懷裡安撫',
+            isCorrect: false,
+            hint: '千萬不可！強抱只會讓受到驚嚇的貓咪更加恐懼，甚至引發劇烈的防衛性抓咬！'
+          },
+          {
+            key: 'C',
+            text: '叫全家大小一起圍上去大聲呼叫牠的名字',
+            isCorrect: false,
+            hint: '這會嚇壞貓咪！吵雜的人群與環境會讓剛到家的新貓咪陷入極大恐慌！'
+          }
+        ]
+      },
+      summary: {
+        clues: '耳朵向後折平（飛機耳）、眼神驚恐警戒、尾巴夾在後腳間、身體緊繃壓低縮成一團。',
+        education: '答對了！這隻小灰貓初來乍到，對陌生環境充滿不安。請記得教育重點：貓咪到新環境容易緊張，需要充足的時間與空間適應，絕對不能急著強行抱摸牠喔！'
+      }
     },
     {
       id: 3,
-      name: "超遠全壘打牆",
-      difficulty: "較高",
-      distance: 105,
-      height: 5,
-      tip: "最後一關！這次的圍牆雖然不高，但距離非常遠！你能擊出冠軍全壘打嗎？",
-      successMsg: "冠軍全壘打！你成功征服所有球場！",
-      wallColor: "#0d47a1",
-      wallTopColor: "#ffc107",
-      skyColor: ["#ff9800", "#fff3e0"], // 冠軍黃昏決戰氛圍
-      flagText: "總冠軍決戰",
-    },
+      badge: '案件三（3／3）',
+      title: '快要爆炸的花貓',
+      sceneClass: 'scene-case-3',
+      description: '走廊上突然有雜物傾倒發出巨響，驚動了這隻花貓。牠現在弓著背全身毛髮豎起，我們該怎麼辦？',
+      catType: 'calico-cat',
+      hotspots: [
+        {
+          id: 'fur',
+          name: '背部與被毛',
+          icon: '🦔',
+          xPercent: 50,
+          yPercent: 32,
+          observation: '背部高高拱起，全身毛髮根根豎直（俗稱「炸毛」）。',
+          meaning: '被毛豎直、炸毛表示生氣或高度緊張。',
+          memo: '拱起背部並炸毛，是為了讓自己看起來巨大以嚇退對手！'
+        },
+        {
+          id: 'tail',
+          name: '尾巴部位',
+          icon: '🐾',
+          xPercent: 18,
+          yPercent: 44,
+          observation: '尾巴毛髮炸開，正大幅度、快速地左右劇烈擺動拍打。',
+          meaning: '尾巴大幅度擺動可能表示煩躁、不開心或警戒。',
+          memo: '不同於狗狗，貓咪尾巴大幅劇烈甩動通常是生氣的警告！'
+        },
+        {
+          id: 'teeth',
+          name: '牙齒與嘴巴',
+          icon: '🦷',
+          xPercent: 74,
+          yPercent: 48,
+          observation: '嘴角向後拉扯、露出銳利牙齒，伴隨低沈嘶嘶聲（哈氣）。',
+          meaning: '露出牙齒或發出哈氣聲，代表發出最後攻擊警告。',
+          memo: '貓咪哈氣或露牙時，表示防衛界線已達到極限！'
+        },
+        {
+          id: 'paws',
+          name: '前腳爪子',
+          icon: '🐾',
+          xPercent: 68,
+          yPercent: 78,
+          observation: '前腳尖銳爪子伸出，肌肉緊繃緊扣地面，重心下沉。',
+          meaning: '前腳伸爪緊扣地面，代表可能準備隨時發動攻擊。',
+          memo: '已進入攻擊預備姿態，切勿靠近！'
+        }
+      ],
+      emotionQuestion: {
+        title: '這隻花貓現在的心情是什麼呢？',
+        options: [
+          {
+            key: 'A',
+            text: '生氣／警戒／可能準備攻擊',
+            isCorrect: true,
+            hint: '非常敏銳！炸毛、拱背、甩尾加露齒哈氣，是典型的生氣與警戒反擊訊號！'
+          },
+          {
+            key: 'B',
+            text: '開心撒嬌討摸摸',
+            isCorrect: false,
+            hint: '千萬別誤會！貓咪撒嬌會發出溫和呼嚕聲，而這隻花貓露齒哈氣又炸毛，非常生氣危險！'
+          },
+          {
+            key: 'C',
+            text: '無聊想睡午覺',
+            isCorrect: false,
+            hint: '再想想看！睡覺的貓咪身體會放鬆蜷曲，不會背部高高拱起、毛髮根根豎立喔！'
+          }
+        ]
+      },
+      actionQuestion: {
+        title: '面對已經發出生氣警告訊號的花貓，最安全的應對是？',
+        confirmedText: '生氣／警戒／可能準備攻擊',
+        options: [
+          {
+            key: 'A',
+            text: '停止接觸，保持距離，讓牠自行冷靜',
+            isCorrect: true,
+            hint: '答對了！當貓咪出現生氣或攻擊訊號時，人類唯一的安全法則就是停止接觸並退後！'
+          },
+          {
+            key: 'B',
+            text: '試著伸手摸摸牠的頭讓牠冷靜下來',
+            isCorrect: false,
+            hint: '極度危險！此時伸手接近，貓咪會視為威脅攻擊，絕對會立刻伸爪抓傷或咬傷你！'
+          },
+          {
+            key: 'C',
+            text: '拿零食直接塞到牠嘴邊討好牠',
+            isCorrect: false,
+            hint: '不適當喔！警戒中的貓咪完全沒有食慾，強行將手靠近嘴邊極易被咬傷！'
+          }
+        ]
+      },
+      summary: {
+        clues: '背部高高拱起、全身炸毛、尾巴毛炸開大幅劇烈甩動、露齒哈氣、前腳伸爪備戰。',
+        education: '答對了！這是一次完美的偵探推理。請永遠牢記：當貓咪出現炸毛、拱背或露牙哈氣等生氣或攻擊訊號時，請立即停止一切接觸，保持安全距離，讓牠有時間自我平復！'
+      }
+    }
   ];
 
-  /* ==========================================================================
-     三、 粒子系統（彩帶與星星火花）
-     ========================================================================== */
-  class ParticleSystem {
+  // ==========================================================================
+  // 三、 貓咪 2D SVG 向量插畫產生器（精緻可愛 Q 版日系風格）
+  // ==========================================================================
+
+  const CatSvgGenerator = {
+    // 1. 案件一：活力橘貓（放鬆、大眼、豎直尾巴晃動、踩踩腳）
+    getOrangeCatSvg() {
+      return `
+        <svg viewBox="0 0 400 320" width="100%" height="100%" aria-hidden="true" style="overflow: visible;">
+          <defs>
+            <linearGradient id="orangeFurGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FFA447"/>
+              <stop offset="50%" stop-color="#FF8E26"/>
+              <stop offset="100%" stop-color="#EA6700"/>
+            </linearGradient>
+            <linearGradient id="stripeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#C85000"/>
+              <stop offset="100%" stop-color="#A73E00"/>
+            </linearGradient>
+          </defs>
+
+          <!-- 尾巴（高高直立搖擺動畫） -->
+          <g class="cat-tail-playful" id="svg-part-tail">
+            <path d="M 120 180 C 80 150 70 80 85 50 C 95 30 115 25 125 38 C 132 48 118 75 110 110 C 105 130 115 160 135 185 Z" 
+                  fill="url(#orangeFurGrad)"/>
+            <!-- 尾巴橘色斑紋 -->
+            <path d="M 88 56 Q 100 50 112 55" stroke="url(#stripeGrad)" stroke-width="4" fill="none" stroke-linecap="round"/>
+            <path d="M 94 80 Q 105 75 116 82" stroke="url(#stripeGrad)" stroke-width="4" fill="none" stroke-linecap="round"/>
+            <path d="M 100 110 Q 112 105 120 112" stroke="url(#stripeGrad)" stroke-width="4" fill="none" stroke-linecap="round"/>
+          </g>
+
+          <!-- 貓咪身體（放鬆舒展橢圓） -->
+          <g id="svg-part-body">
+            <ellipse cx="210" cy="205" rx="95" ry="68" fill="url(#orangeFurGrad)"/>
+            <!-- 背部花紋 -->
+            <path d="M 170 145 Q 185 165 170 185" stroke="url(#stripeGrad)" stroke-width="5" fill="none" stroke-linecap="round"/>
+            <path d="M 200 140 Q 215 162 202 188" stroke="url(#stripeGrad)" stroke-width="5" fill="none" stroke-linecap="round"/>
+            <path d="M 230 142 Q 242 165 232 185" stroke="url(#stripeGrad)" stroke-width="5" fill="none" stroke-linecap="round"/>
+            <!-- 白肚肚 -->
+            <ellipse cx="230" cy="225" rx="55" ry="38" fill="#FFF8EE"/>
+          </g>
+
+          <!-- 後腳 -->
+          <ellipse cx="145" cy="245" rx="32" ry="22" fill="#EA6700"/>
+          <ellipse cx="155" cy="250" rx="20" ry="14" fill="#FFF8EE"/>
+
+          <!-- 前腳（輕微踏踏踩奶放鬆姿勢） -->
+          <g id="svg-part-paws">
+            <rect x="250" y="210" width="24" height="52" rx="12" fill="#FFA447"/>
+            <rect x="280" y="212" width="24" height="50" rx="12" fill="#FFA447"/>
+            <ellipse cx="262" cy="260" rx="15" ry="9" fill="#FFF8EE"/>
+            <ellipse cx="292" cy="260" rx="15" ry="9" fill="#FFF8EE"/>
+            <!-- 粉紅小肉墊線條 -->
+            <circle cx="262" cy="261" r="3" fill="#FFAB91"/>
+            <circle cx="292" cy="261" r="3" fill="#FFAB91"/>
+          </g>
+
+          <!-- 貓咪頭部 -->
+          <g id="svg-part-head">
+            <ellipse cx="270" cy="130" rx="66" ry="56" fill="url(#orangeFurGrad)"/>
+
+            <!-- 耳朵（自然豎直朝前） -->
+            <g id="svg-part-ears">
+              <polygon points="225,95 210,35 258,68" fill="#EA6700"/>
+              <polygon points="226,90 216,45 250,70" fill="#FFCCBC"/>
+              <polygon points="305,92 345,35 320,85" fill="#EA6700"/>
+              <polygon points="308,88 335,46 318,80" fill="#FFCCBC"/>
+            </g>
+
+            <!-- 額頭虎斑花紋 -->
+            <path d="M 270 82 L 270 98" stroke="url(#stripeGrad)" stroke-width="4" stroke-linecap="round"/>
+            <path d="M 260 86 Q 270 96 280 86" stroke="url(#stripeGrad)" stroke-width="3" fill="none" stroke-linecap="round"/>
+
+            <!-- 眼睛（好奇大眼溫和放鬆） -->
+            <g id="svg-part-eyes">
+              <ellipse cx="244" cy="128" rx="12" ry="16" fill="#43A047"/>
+              <ellipse cx="290" cy="128" rx="12" ry="16" fill="#43A047"/>
+              <!-- 瞳孔微放大（好奇想玩） -->
+              <ellipse cx="244" cy="128" rx="7" ry="13" fill="#1B5E20"/>
+              <ellipse cx="290" cy="128" rx="7" ry="13" fill="#1B5E20"/>
+              <!-- 水亮高光 -->
+              <circle cx="240" cy="122" r="4.5" fill="#FFFFFF"/>
+              <circle cx="286" cy="122" r="4.5" fill="#FFFFFF"/>
+              <circle cx="246" cy="132" r="2" fill="#FFFFFF"/>
+              <circle cx="292" cy="132" r="2" fill="#FFFFFF"/>
+            </g>
+
+            <!-- 鼻子與三叉嘴 -->
+            <polygon points="267,144 261,138 273,138" fill="#FF8A80"/>
+            <path d="M 261,146 Q 267,152 267,145 Q 267,152 273,146" fill="none" stroke="#5D4037" stroke-width="2.5" stroke-linecap="round"/>
+
+            <!-- 鬍鬚（放鬆舒展） -->
+            <line x1="228" y1="142" x2="195" y2="138" stroke="#5D4037" stroke-width="2" stroke-linecap="round"/>
+            <line x1="228" y1="148" x2="192" y2="152" stroke="#5D4037" stroke-width="2" stroke-linecap="round"/>
+            <line x1="305" y1="142" x2="338" y2="138" stroke="#5D4037" stroke-width="2" stroke-linecap="round"/>
+            <line x1="305" y1="148" x2="340" y2="152" stroke="#5D4037" stroke-width="2" stroke-linecap="round"/>
+          </g>
+        </svg>
+      `;
+    },
+
+    // 2. 案件二：害怕的小灰貓（飛機耳、縮在角落紙箱旁、夾尾巴、大恐慌眼神）
+    getGrayCatSvg() {
+      return `
+        <svg viewBox="0 0 400 320" width="100%" height="100%" aria-hidden="true" style="overflow: visible;">
+          <defs>
+            <linearGradient id="grayFurGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#B0BEC5"/>
+              <stop offset="50%" stop-color="#90A4AE"/>
+              <stop offset="100%" stop-color="#607D8B"/>
+            </linearGradient>
+            <linearGradient id="boxGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#D7CCC8"/>
+              <stop offset="100%" stop-color="#A1887F"/>
+            </linearGradient>
+          </defs>
+
+          <!-- 角落瓦楞紙箱背景 -->
+          <g id="svg-part-box" opacity="0.85">
+            <polygon points="60,260 140,230 140,300 60,320" fill="#8D6E63"/>
+            <polygon points="140,230 330,225 330,295 140,300" fill="url(#boxGrad)"/>
+            <polygon points="60,260 140,230 330,225 240,255" fill="#BCAAA4"/>
+            <!-- 紙箱膠帶痕跡 -->
+            <line x1="180" y1="227" x2="180" y2="298" stroke="#FFE082" stroke-width="8" opacity="0.6"/>
+          </g>
+
+          <!-- 尾巴（夾在兩腳之間縮緊緊、微弱顫抖） -->
+          <g class="cat-tail-scared" id="svg-part-tail">
+            <path d="M 170 240 C 140 250 120 262 125 272 C 130 278 145 275 165 262 C 185 250 200 248 185 242 Z" 
+                  fill="#78909C"/>
+          </g>
+
+          <!-- 縮小壓低緊繃的身體 -->
+          <g class="cat-body-scared" id="svg-part-body">
+            <ellipse cx="230" cy="225" rx="80" ry="52" fill="url(#grayFurGrad)"/>
+            <!-- 緊繃蜷縮的後腿 -->
+            <ellipse cx="175" cy="240" rx="34" ry="22" fill="#607D8B"/>
+            <!-- 前腳縮在胸口不敢伸出 -->
+            <ellipse cx="255" cy="252" rx="14" ry="12" fill="#CFD8DC"/>
+            <ellipse cx="278" cy="252" rx="14" ry="12" fill="#CFD8DC"/>
+          </g>
+
+          <!-- 貓咪頭部（壓得很低） -->
+          <g id="svg-part-head">
+            <ellipse cx="260" cy="165" rx="58" ry="46" fill="url(#grayFurGrad)"/>
+
+            <!-- 飛機耳（向兩側橫向折平貼在頭頂） -->
+            <g id="svg-part-ears">
+              <!-- 左耳橫向貼平 -->
+              <polygon points="215,152 145,158 200,172" fill="#607D8B"/>
+              <polygon points="212,154 155,160 198,170" fill="#FFCCBC"/>
+              <!-- 右耳橫向貼平 -->
+              <polygon points="305,152 375,158 320,172" fill="#607D8B"/>
+              <polygon points="308,154 365,160 322,170" fill="#FFCCBC"/>
+            </g>
+
+            <!-- 眼睛（瞳孔高度放大、驚恐不安水汪汪） -->
+            <g id="svg-part-eyes">
+              <ellipse cx="238" cy="162" rx="15" ry="16" fill="#FFF"/>
+              <ellipse cx="282" cy="162" rx="15" ry="16" fill="#FFF"/>
+              <!-- 瞳孔極度放大（驚嚇受威脅） -->
+              <circle cx="238" cy="162" r="12.5" fill="#263238"/>
+              <circle cx="282" cy="162" r="12.5" fill="#263238"/>
+              <!-- 驚恐淚珠光澤 -->
+              <circle cx="233" cy="157" r="4.5" fill="#FFFFFF"/>
+              <circle cx="277" cy="157" r="4.5" fill="#FFFFFF"/>
+              <circle cx="242" cy="166" r="2" fill="#FFFFFF"/>
+              <circle cx="286" cy="166" r="2" fill="#FFFFFF"/>
+            </g>
+
+            <!-- 緊抿的小鼻子與小嘴 -->
+            <polygon points="260,178 255,173 265,173" fill="#FFAB91"/>
+            <path d="M 255,180 Q 260,183 260,179 Q 260,183 265,180" fill="none" stroke="#37474F" stroke-width="2" stroke-linecap="round"/>
+
+            <!-- 緊繃垂下的鬍鬚 -->
+            <line x1="225" y1="178" x2="198" y2="185" stroke="#455A64" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="225" y1="184" x2="202" y2="194" stroke="#455A64" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="295" y1="178" x2="322" y2="185" stroke="#455A64" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="295" y1="184" x2="318" y2="194" stroke="#455A64" stroke-width="1.8" stroke-linecap="round"/>
+          </g>
+        </svg>
+      `;
+    },
+
+    // 3. 案件三：生氣炸毛花貓（拱背炸毛鋸齒、劇烈拍打甩尾、露齒哈氣嘴、倒豎伸爪）
+    getCalicoCatSvg() {
+      return `
+        <svg viewBox="0 0 400 320" width="100%" height="100%" aria-hidden="true" style="overflow: visible;">
+          <defs>
+            <linearGradient id="calicoOrange" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FF7043"/>
+              <stop offset="100%" stop-color="#D84315"/>
+            </linearGradient>
+            <linearGradient id="calicoBlack" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#424242"/>
+              <stop offset="100%" stop-color="#212121"/>
+            </linearGradient>
+          </defs>
+
+          <!-- 尾巴（炸毛、蓬鬆巨幅且劇烈快速抽打動畫） -->
+          <g class="cat-tail-angry" id="svg-part-tail">
+            <!-- 炸開毛躁鋸齒尾巴 -->
+            <path d="M 120 185 
+                     L 85 170 L 98 155 L 70 145 L 85 130 L 60 115 L 80 100 L 55 80 L 80 70 L 65 45
+                     L 85 30 L 105 52 L 100 70 L 120 88 L 115 110 L 132 135 L 125 160 Z" 
+                  fill="url(#calicoBlack)"/>
+            <path d="M 75 75 L 90 60 L 85 85 L 105 75" stroke="#FF7043" stroke-width="3" fill="none"/>
+          </g>
+
+          <!-- 拱背炸毛身體（鋸齒狀背部突起） -->
+          <g id="svg-part-body">
+            <!-- 拱起的鋸齒背部外型 -->
+            <path d="M 115 235 
+                     L 125 190 L 118 180 L 135 155 L 128 145 L 150 120 L 142 110 L 175 90 L 170 82 
+                     L 205 70 L 215 82 L 235 75 L 245 90 L 265 92 L 275 110 L 285 135 L 295 180 
+                     L 280 245 L 210 240 Z" 
+                  fill="#FFF8E7"/>
+
+            <!-- 三花斑塊（背部黑橘相間） -->
+            <path d="M 135 155 L 150 120 L 175 90 L 195 110 L 180 160 L 140 180 Z" fill="url(#calicoBlack)"/>
+            <path d="M 195 75 L 235 75 L 245 90 L 230 135 L 190 130 Z" fill="url(#calicoOrange)"/>
+
+            <!-- 後腳緊繃抓地 -->
+            <path d="M 125 210 L 110 260 L 145 265 L 155 225 Z" fill="#212121"/>
+          </g>
+
+          <!-- 前腳（伸出鋒利爪子抓扣地面） -->
+          <g id="svg-part-paws">
+            <rect x="250" y="195" width="22" height="65" rx="6" fill="#FFF8E7"/>
+            <rect x="280" y="195" width="22" height="65" rx="6" fill="url(#calicoOrange)"/>
+            <!-- 伸出的爪子 -->
+            <path d="M 248 260 L 242 268 M 255 260 L 253 270 M 264 260 L 266 270" stroke="#FFF" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M 278 260 L 272 268 M 285 260 L 283 270 M 294 260 L 296 270" stroke="#FFF" stroke-width="2.5" stroke-linecap="round"/>
+          </g>
+
+          <!-- 貓咪頭部（壓平怒視） -->
+          <g id="svg-part-head">
+            <ellipse cx="285" cy="150" rx="55" ry="46" fill="#FFF8E7"/>
+            <path d="M 245 130 Q 285 110 325 130 Q 300 170 245 130" fill="url(#calicoOrange)"/>
+
+            <!-- 耳朵（壓平緊貼向後，防衛戒備） -->
+            <g id="svg-part-ears">
+              <polygon points="250,135 190,115 235,150" fill="#212121"/>
+              <polygon points="245,135 200,122 232,146" fill="#FF8A80"/>
+              <polygon points="325,135 385,115 340,150" fill="url(#calicoOrange)"/>
+              <polygon points="322,135 370,122 338,146" fill="#FF8A80"/>
+            </g>
+
+            <!-- 眼睛（倒八字怒視眼，犀利警戒） -->
+            <g id="svg-part-eyes">
+              <!-- 左眼怒視線條 -->
+              <polygon points="255,140 278,145 265,158" fill="#FDD835"/>
+              <line x1="266" y1="142" x2="266" y2="156" stroke="#212121" stroke-width="4" stroke-linecap="round"/>
+              <!-- 右眼怒視線條 -->
+              <polygon points="315,140 292,145 305,158" fill="#FDD835"/>
+              <line x1="304" y1="142" x2="304" y2="156" stroke="#212121" stroke-width="4" stroke-linecap="round"/>
+            </g>
+
+            <!-- 嘴巴（露齒哈氣嘶嘶嘴） -->
+            <g id="svg-part-mouth">
+              <path d="M 270 162 Q 285 158 300 162 Q 285 184 270 162 Z" fill="#880E4F"/>
+              <!-- 上尖牙 -->
+              <polygon points="274,162 278,172 282,162" fill="#FFFFFF"/>
+              <polygon points="288,162 292,172 296,162" fill="#FFFFFF"/>
+              <!-- 下尖牙 -->
+              <polygon points="281,180 285,173 289,180" fill="#FFFFFF"/>
+            </g>
+
+            <!-- 炸開怒張的鬍鬚 -->
+            <line x1="250" y1="158" x2="215" y2="148" stroke="#212121" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="250" y1="165" x2="210" y2="168" stroke="#212121" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="320" y1="158" x2="355" y2="148" stroke="#212121" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="320" y1="165" x2="360" y2="168" stroke="#212121" stroke-width="2.5" stroke-linecap="round"/>
+          </g>
+        </svg>
+      `;
+    }
+  };
+
+  // ==========================================================================
+  // 四、 遊戲主核心控制器（GameEngine）
+  // ==========================================================================
+
+  class CatDetectiveGame {
     constructor() {
-      this.particles = [];
-      this.colors = ["#f44336", "#e91e63", "#9c27b0", "#2196f3", "#4caf50", "#ffeb3b", "#ff9800"];
-    }
+      this.currentCaseIndex = 0;
+      this.collectedClues = new Set();
+      this.idleTimer = null;
+      this.idleReminderSeconds = 12;
 
-    // 爆發慶祝彩帶
-    explodeConfetti(x, y, count = 120) {
-      for (let i = 0; i < count; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 2 + Math.random() * 8;
-        this.particles.push({
-          x: x,
-          y: y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed - 3,
-          color: this.colors[Math.floor(Math.random() * this.colors.length)],
-          size: 6 + Math.random() * 6,
-          rotation: Math.random() * 360,
-          rotSpeed: (Math.random() - 0.5) * 15,
-          alpha: 1,
-          gravity: 0.15,
-          life: 90 + Math.random() * 40,
-          type: Math.random() > 0.4 ? "rect" : "star",
-        });
-      }
-    }
+      // 快取 DOM 節點
+      this.dom = {
+        app: document.getElementById('game-app'),
+        hudBadgeText: document.getElementById('hud-case-badge-text'),
+        hudCaseName: document.getElementById('hud-case-name'),
+        clueCountNum: document.getElementById('clue-count-num'),
+        clueTotalNum: document.getElementById('clue-total-num'),
+        soundToggleBtn: document.getElementById('btn-sound-toggle'),
+        soundIcon: document.getElementById('sound-icon'),
+        soundStatusText: document.getElementById('sound-status-text'),
 
-    // 擊球火花
-    sparkHit(x, y, count = 20) {
-      for (let i = 0; i < count; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 1.5 + Math.random() * 5;
-        this.particles.push({
-          x: x,
-          y: y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          color: "#fff59d",
-          size: 3 + Math.random() * 4,
-          rotation: 0,
-          rotSpeed: 0,
-          alpha: 1,
-          gravity: 0.05,
-          life: 25,
-          type: "spark",
-        });
-      }
-    }
+        sceneBg: document.getElementById('scene-background'),
+        bannerTitle: document.getElementById('banner-case-title'),
+        bannerDesc: document.getElementById('banner-case-desc'),
+        catSvgWrapper: document.getElementById('cat-svg-wrapper'),
+        hotspotsLayer: document.getElementById('hotspots-layer'),
 
-    update() {
-      for (let i = this.particles.length - 1; i >= 0; i--) {
-        const p = this.particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.vy += p.gravity;
-        p.rotation += p.rotSpeed;
-        p.life--;
-        p.alpha = Math.max(0, p.life / 60);
+        guideTooltip: document.getElementById('guide-tooltip'),
+        guideTooltipText: document.getElementById('guide-tooltip-text'),
 
-        if (p.life <= 0 || p.y > 750) {
-          this.particles.splice(i, 1);
-        }
-      }
-    }
+        cluePopupCard: document.getElementById('clue-popup-card'),
+        cluePartIcon: document.getElementById('clue-card-part-icon'),
+        cluePartName: document.getElementById('clue-card-part-name'),
+        clueDetail: document.getElementById('clue-card-detail'),
+        clueMemo: document.getElementById('clue-card-memo'),
+        btnCloseClue: document.getElementById('btn-close-clue'),
+        btnConfirmClue: document.getElementById('btn-confirm-clue'),
 
-    draw(ctx) {
-      this.particles.forEach((p) => {
-        ctx.save();
-        ctx.globalAlpha = p.alpha;
-        ctx.translate(p.x, p.y);
-        ctx.rotate((p.rotation * Math.PI) / 180);
-        ctx.fillStyle = p.color;
+        panelClueStatus: document.getElementById('panel-clue-status-text'),
+        cluesTagList: document.getElementById('clues-tag-list'),
+        btnTriggerDeduction: document.getElementById('btn-trigger-deduction'),
 
-        if (p.type === "rect") {
-          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
-        } else if (p.type === "star") {
-          ctx.beginPath();
-          for (let s = 0; s < 5; s++) {
-            ctx.lineTo(
-              Math.cos(((18 + s * 72) * Math.PI) / 180) * p.size,
-              -Math.sin(((18 + s * 72) * Math.PI) / 180) * p.size
-            );
-            ctx.lineTo(
-              Math.cos(((54 + s * 72) * Math.PI) / 180) * (p.size / 2),
-              -Math.sin(((54 + s * 72) * Math.PI) / 180) * (p.size / 2)
-            );
-          }
-          ctx.closePath();
-          ctx.fill();
-        } else {
-          // spark
-          ctx.beginPath();
-          ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        ctx.restore();
-      });
-    }
+        // 全螢幕畫面模態
+        screenStart: document.getElementById('screen-start'),
+        btnStartGame: document.getElementById('btn-start-game'),
 
-    clear() {
-      this.particles = [];
-    }
-  }
+        screenEmotion: document.getElementById('screen-emotion-guess'),
+        emotionClueRecap: document.getElementById('emotion-clue-recap'),
+        emotionOptionsGroup: document.getElementById('emotion-options-group'),
+        emotionFeedbackBox: document.getElementById('emotion-feedback-box'),
+        emotionFeedbackText: document.getElementById('emotion-feedback-text'),
+        btnBackToObserve1: document.getElementById('btn-back-to-observe-1'),
 
-  /* ==========================================================================
-     四、 主遊戲控制類別
-     ========================================================================== */
-  class HomeRunGame {
-    constructor() {
-      this.sound = new SoundManager();
-      this.particles = new ParticleSystem();
+        screenAction: document.getElementById('screen-action-guess'),
+        confirmedEmotionBadge: document.getElementById('confirmed-emotion-badge'),
+        actionOptionsGroup: document.getElementById('action-options-group'),
+        actionFeedbackBox: document.getElementById('action-feedback-box'),
+        actionFeedbackText: document.getElementById('action-feedback-text'),
+        btnBackToObserve2: document.getElementById('btn-back-to-observe-2'),
 
-      // 遊戲狀態與關卡進度
-      this.currentLevelIndex = 0; // 0, 1, 2
-      this.chancesLeft = 3;
-      this.angle = 45; // 擊球角度 15° ~ 75°
-      this.power = 75; // 擊球力道 40% ~ 100%
+        screenSuccess: document.getElementById('screen-case-success'),
+        successCaseName: document.getElementById('success-case-name'),
+        successExpClues: document.getElementById('success-exp-clues'),
+        successExpEducation: document.getElementById('success-exp-education'),
+        btnNextCase: document.getElementById('btn-next-case'),
+        btnNextCaseText: document.getElementById('btn-next-case-text'),
 
-      // 揮棒與球飛行狀態
-      this.isSwinging = false;
-      this.swingPhase = 0; // 0: 準備, 1: 揮擊中, 2: 慶祝, 3: 失敗懊惱
-      this.batterAnimTimer = 0;
-      this.flightActive = false;
-      this.flightStartTime = 0;
-      this.ballPath = []; // 歷史軌跡紀錄
-      this.ball = {
-        x: 0,
-        y: PHYSICS.y0,
-        vx: 0,
-        vy: 0,
-        landed: false,
-        hitWall: false,
-        isHomeRun: false,
+        screenComplete: document.getElementById('screen-game-complete'),
+        btnReplayGame: document.getElementById('btn-replay-game'),
+        btnReturnHome: document.getElementById('btn-return-home')
       };
 
-      // 判定結果暫存
-      this.lastResult = null; // { type: 'HOMERUN' | 'SHORT' | 'LOW' | 'HIGH_SHORT', msg: '' }
-
-      // 畫面元素綁定
-      this.canvas = document.getElementById("game-canvas");
-      this.ctx = this.canvas.getContext("2d");
-
-      // UI 元素
-      this.levelNumEl = document.getElementById("hud-level-num");
-      this.levelNameEl = document.getElementById("hud-level-name");
-      this.chancesContainerEl = document.getElementById("hud-chances");
-      this.soundToggleBtn = document.getElementById("sound-toggle-btn");
-      this.soundIconEl = document.getElementById("sound-icon");
-      this.levelBannerEl = document.getElementById("level-banner");
-
-      this.angleSlider = document.getElementById("angle-slider");
-      this.angleValEl = document.getElementById("angle-val");
-      this.powerSlider = document.getElementById("power-slider");
-      this.powerValEl = document.getElementById("power-val");
-      this.swingBtn = document.getElementById("swing-btn");
-
-      this.toastEl = document.getElementById("toast-notice");
-      this.toastMsgEl = document.getElementById("toast-message");
-      this.homerunBannerEl = document.getElementById("homerun-banner");
-
-      // 遮罩彈窗
-      this.startScreen = document.getElementById("start-screen");
-      this.startBtn = document.getElementById("start-btn");
-
-      this.levelClearScreen = document.getElementById("level-clear-screen");
-      this.levelClearTitle = document.getElementById("level-clear-title");
-      this.levelClearMsg = document.getElementById("level-clear-msg");
-      this.nextLevelBtn = document.getElementById("next-level-btn");
-
-      this.levelFailScreen = document.getElementById("level-fail-screen");
-      this.levelFailHint = document.getElementById("level-fail-hint");
-      this.retryBtn = document.getElementById("retry-btn");
-      this.failHomeBtn = document.getElementById("fail-home-btn");
-
-      this.championScreen = document.getElementById("champion-screen");
-      this.championRestartBtn = document.getElementById("champion-restart-btn");
-      this.championHomeBtn = document.getElementById("champion-home-btn");
-
-      // 雲朵裝飾
-      this.clouds = [
-        { x: 120, y: 70, s: 0.9, spd: 0.2 },
-        { x: 480, y: 110, s: 1.2, spd: 0.25 },
-        { x: 890, y: 60, s: 0.8, spd: 0.18 },
-        { x: 1180, y: 130, s: 1.0, spd: 0.22 },
-      ];
-
-      // 觀眾小人隨機擺動相位
-      this.audienceCount = 38;
-      this.audienceOffsets = Array.from({ length: this.audienceCount }, () => Math.random() * Math.PI * 2);
-
-      this.initEvents();
-      this.resizeCanvas();
-      window.addEventListener("resize", () => this.resizeCanvas());
-
-      // 啟動主繪圖迴圈
-      this.lastFrameTime = performance.now();
-      requestAnimationFrame((t) => this.loop(t));
+      this.currentInspectedClue = null;
+      this.bindEvents();
     }
 
-    // 事件監聽與綁定
-    initEvents() {
-      // 點擊開始挑戰：依照規範直接進第一關，不出現任何教學
-      this.startBtn.addEventListener("click", () => {
-        this.sound.init();
-        this.sound.playClick();
-        this.hideAllOverlays();
-        this.startLevel(0);
+    // 綁定事件監聽器
+    bindEvents() {
+      // 1. 音效切換
+      this.dom.soundToggleBtn.addEventListener('click', () => {
+        const isEnabled = sounds.toggle();
+        this.dom.soundIcon.textContent = isEnabled ? '🔊' : '🔇';
+        this.dom.soundStatusText.textContent = isEnabled ? '音效' : '靜音';
+        sounds.playClick();
       });
 
-      // 角度滑桿即時連動
-      this.angleSlider.addEventListener("input", (e) => {
-        this.angle = parseInt(e.target.value, 10);
-        this.angleValEl.textContent = `${this.angle}°`;
+      // 2. 開始遊戲
+      this.dom.btnStartGame.addEventListener('click', () => {
+        sounds.playClick();
+        this.hideAllScreens();
+        this.loadCase(0);
+        // 第一關初始給予簡短提示
+        this.showGuideToast('點擊貓咪身上的發光部位，蒐集線索，再判斷牠的情緒！');
       });
 
-      // 力道滑桿即時連動
-      this.powerSlider.addEventListener("input", (e) => {
-        this.power = parseInt(e.target.value, 10);
-        this.powerValEl.textContent = `${this.power}%`;
-        this.updatePowerTrackStyle();
+      // 3. 關閉與確認線索卡
+      this.dom.btnCloseClue.addEventListener('click', () => {
+        sounds.playClick();
+        this.hideClueCard();
       });
 
-      // 揮棒按鈕
-      this.swingBtn.addEventListener("click", () => {
-        this.handleSwingAction();
+      this.dom.btnConfirmClue.addEventListener('click', () => {
+        sounds.playClick();
+        this.hideClueCard();
       });
 
-      // 音效切換按鈕
-      this.soundToggleBtn.addEventListener("click", () => {
-        this.sound.init();
-        const enabled = this.sound.toggle();
-        this.soundIconEl.textContent = enabled ? "🔊" : "🔇";
-        if (enabled) this.sound.playClick();
+      // 4. 點擊「我知道了！開始推理」
+      this.dom.btnTriggerDeduction.addEventListener('click', () => {
+        sounds.playClick();
+        this.handleStartDeduction();
       });
 
-      // 關卡過關「下一關」按鈕
-      this.nextLevelBtn.addEventListener("click", () => {
-        this.sound.playClick();
-        this.hideAllOverlays();
-        if (this.currentLevelIndex + 1 < LEVELS.length) {
-          this.startLevel(this.currentLevelIndex + 1);
+      // 5. 返回觀察按鈕
+      this.dom.btnBackToObserve1.addEventListener('click', () => {
+        sounds.playClick();
+        this.dom.screenEmotion.classList.add('hidden');
+      });
+
+      this.dom.btnBackToObserve2.addEventListener('click', () => {
+        sounds.playClick();
+        this.dom.screenAction.classList.add('hidden');
+      });
+
+      // 6. 前往下一個案件
+      this.dom.btnNextCase.addEventListener('click', () => {
+        sounds.playClick();
+        this.dom.screenSuccess.classList.add('hidden');
+        if (this.currentCaseIndex < CASES_DATA.length - 1) {
+          this.loadCase(this.currentCaseIndex + 1);
         } else {
-          this.showChampionScreen();
+          this.showCompleteScreen();
         }
       });
 
-      // 挑戰失敗「重新挑戰本關」按鈕
-      this.retryBtn.addEventListener("click", () => {
-        this.sound.playClick();
-        this.hideAllOverlays();
-        this.startLevel(this.currentLevelIndex);
+      // 7. 再玩一次
+      this.dom.btnReplayGame.addEventListener('click', () => {
+        sounds.playClick();
+        this.hideAllScreens();
+        this.loadCase(0);
       });
 
-      // 挑戰失敗「返回首頁」按鈕
-      this.failHomeBtn.addEventListener("click", () => {
-        this.sound.playClick();
-        this.hideAllOverlays();
-        this.showStartScreen();
+      // 8. 返回首頁
+      this.dom.btnReturnHome.addEventListener('click', () => {
+        sounds.playClick();
+        this.hideAllScreens();
+        this.dom.screenStart.classList.remove('hidden');
+        this.dom.screenStart.classList.add('active-screen');
       });
 
-      // 冠軍「重新挑戰」按鈕
-      this.championRestartBtn.addEventListener("click", () => {
-        this.sound.playClick();
-        this.hideAllOverlays();
-        this.startLevel(0);
+      // 9. 監聽全域點擊以重設閒置計時器
+      window.addEventListener('pointerdown', () => {
+        this.resetIdleTimer();
       });
-
-      // 冠軍「返回首頁」按鈕
-      this.championHomeBtn.addEventListener("click", () => {
-        this.sound.playClick();
-        this.hideAllOverlays();
-        this.showStartScreen();
-      });
-
-      // 預設更新一次力道顏色條
-      this.updatePowerTrackStyle();
     }
 
-    // 更新力道滑桿背景漸層色彩
-    updatePowerTrackStyle() {
-      const min = 40;
-      const max = 100;
-      const pct = ((this.power - min) / (max - min)) * 100;
-      this.powerSlider.style.background = `linear-gradient(to right, #4caf50 0%, #fbc02d 50%, #f44336 100%)`;
+    // 隱藏所有彈窗畫面
+    hideAllScreens() {
+      this.dom.screenStart.classList.add('hidden');
+      this.dom.screenStart.classList.remove('active-screen');
+      this.dom.screenEmotion.classList.add('hidden');
+      this.dom.screenAction.classList.add('hidden');
+      this.dom.screenSuccess.classList.add('hidden');
+      this.dom.screenComplete.classList.add('hidden');
+      this.hideClueCard();
     }
 
-    // Canvas 邏輯解析度維持 1280x720，高 DPI 銳利繪製
-    resizeCanvas() {
-      const rect = this.canvas.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      this.canvas.width = 1280 * dpr;
-      this.canvas.height = 720 * dpr;
-      this.ctx.resetTransform();
-      this.ctx.scale(dpr, dpr);
+    // 載入案件
+    loadCase(index) {
+      this.currentCaseIndex = index;
+      this.collectedClues.clear();
+      const caseData = CASES_DATA[index];
+
+      // 更新 HUD
+      this.dom.hudBadgeText.textContent = caseData.badge;
+      this.dom.hudCaseName.textContent = caseData.title;
+      this.dom.clueCountNum.textContent = '0';
+      this.dom.clueTotalNum.textContent = caseData.hotspots.length.toString();
+
+      // 更新背景與橫幅
+      this.dom.sceneBg.className = `scene-bg ${caseData.sceneClass}`;
+      this.dom.bannerTitle.textContent = caseData.badge;
+      this.dom.bannerDesc.textContent = caseData.description;
+
+      // 渲染貓咪 SVG
+      this.renderCatSvg(caseData.catType);
+
+      // 渲染熱點按鈕
+      this.renderHotspots(caseData.hotspots);
+
+      // 重設底部筆記本摘要
+      this.updateCluesNotebookUI();
+
+      // 重設閒置計時器
+      this.resetIdleTimer();
     }
 
-    // 關卡初始化
-    startLevel(index) {
-      this.currentLevelIndex = index;
-      this.chancesLeft = 3;
-      this.isSwinging = false;
-      this.swingPhase = 0;
-      this.flightActive = false;
-      this.ballPath = [];
-      this.particles.clear();
-      this.hideToast();
-      this.homerunBannerEl.classList.remove("active");
-
-      const level = LEVELS[this.currentLevelIndex];
-      this.levelNumEl.textContent = `${level.id}／${LEVELS.length}`;
-      this.levelNameEl.textContent = level.name;
-      this.levelBannerEl.textContent = `第 ${level.id} 關：${level.name}（全壘打牆高度：${level.height}，距離：${level.distance}）- ${level.tip}`;
-
-      this.updateChancesHUD();
-      this.enableControls(true);
-
-      // 重設球位置到擊球點
-      this.ball.x = 0;
-      this.ball.y = PHYSICS.y0;
-      this.ball.vx = 0;
-      this.ball.vy = 0;
-      this.ball.landed = false;
-      this.ball.hitWall = false;
-      this.ball.isHomeRun = false;
-    }
-
-    // 更新剩餘揮棒次數圖示
-    updateChancesHUD() {
-      this.chancesContainerEl.innerHTML = "";
-      for (let i = 0; i < 3; i++) {
-        const ball = document.createElement("div");
-        ball.className = "ball-chance" + (i >= this.chancesLeft ? " used" : "");
-        this.chancesContainerEl.appendChild(ball);
+    // 渲染貓咪 SVG
+    renderCatSvg(type) {
+      let svgHtml = '';
+      if (type === 'orange-cat') {
+        svgHtml = CatSvgGenerator.getOrangeCatSvg();
+      } else if (type === 'gray-cat') {
+        svgHtml = CatSvgGenerator.getGrayCatSvg();
+      } else if (type === 'calico-cat') {
+        svgHtml = CatSvgGenerator.getCalicoCatSvg();
       }
+      this.dom.catSvgWrapper.innerHTML = svgHtml;
     }
 
-    // 啟用或鎖定控制元件（避免揮棒動畫中重複點擊）
-    enableControls(enable) {
-      this.swingBtn.disabled = !enable;
-      this.angleSlider.disabled = !enable;
-      this.powerSlider.disabled = !enable;
+    // 渲染熱點按鈕
+    renderHotspots(hotspots) {
+      this.dom.hotspotsLayer.innerHTML = '';
+
+      hotspots.forEach((spot) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'hotspot-btn';
+        btn.style.left = `${spot.xPercent}%`;
+        btn.style.top = `${spot.yPercent}%`;
+        btn.setAttribute('aria-label', `觀察貓咪${spot.name}`);
+        btn.innerHTML = `
+          <span>${spot.icon}</span>
+          <span class="hotspot-label-tip">${spot.name}</span>
+        `;
+
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.inspectHotspot(spot, btn);
+        });
+
+        this.dom.hotspotsLayer.appendChild(btn);
+      });
     }
 
-    // 執行揮棒動作
-    handleSwingAction() {
-      if (this.isSwinging || this.chancesLeft <= 0) return;
-      this.sound.init();
+    // 點擊熱點進行檢查
+    inspectHotspot(spot, btnElement) {
+      sounds.playClue();
+      this.collectedClues.add(spot.id);
 
-      // 1. 扣除揮棒次數
-      this.chancesLeft--;
-      this.updateChancesHUD();
-
-      // 2. 停用操作控制項
-      this.enableControls(false);
-      this.isSwinging = true;
-      this.swingPhase = 1; // 揮棒中
-      this.batterAnimTimer = 0;
-      this.ballPath = [];
-      this.hideToast();
-
-      // 3. 播放揮棒音效
-      this.sound.playSwing();
-
-      // 4. 計算初速度與物理軌跡
-      const v = (this.power / 100.0) * PHYSICS.vScale;
-      const rad = (this.angle * Math.PI) / 180.0;
-      const vx = v * Math.cos(rad);
-      const vy = v * Math.sin(rad);
-
-      // 模擬整個飛行過程並事先算出判定結果
-      this.lastResult = this.calculatePhysicsResult(vx, vy);
-
-      // 揮棒延遲約 180ms 後正中球心擊出
-      setTimeout(() => {
-        this.sound.playHit();
-        const pX = PHYSICS.originX;
-        const pY = PHYSICS.groundY - PHYSICS.y0 * PHYSICS.scale;
-        this.particles.sparkHit(pX, pY, 25);
-
-        // 啟動球的飛行動畫
-        this.flightActive = true;
-        this.flightStartTime = performance.now();
-        this.ball.x = 0;
-        this.ball.y = PHYSICS.y0;
-        this.ball.vx = vx;
-        this.ball.vy = vy;
-        this.ball.landed = false;
-        this.ball.hitWall = false;
-      }, 180);
-    }
-
-    // 依據物理公式精確計算挑戰結果與提示訊息
-    calculatePhysicsResult(vx, vy) {
-      const level = LEVELS[this.currentLevelIndex];
-      const D = level.distance;
-      const H = level.height;
-      const g = PHYSICS.g;
-      const y0 = PHYSICS.y0;
-      const r = PHYSICS.ballRadius;
-
-      // 落地時間：y(t) = y0 + vy*t - 0.5*g*t^2 = 0
-      const disc = vy * vy + 2 * g * y0;
-      const tLand = (vy + Math.sqrt(disc)) / g;
-      const xLand = vx * tLand;
-
-      // 頂點高度與頂點時間
-      const tApex = vy / g;
-      const yApex = y0 + (vy * vy) / (2 * g);
-
-      // 判斷是否能達到牆面
-      if (xLand < D) {
-        // 尚未抵達牆面即落地
-        if (this.angle >= 55) {
-          return {
-            type: "HIGH_SHORT",
-            tLand: tLand,
-            xLand: xLand,
-            msg: "這顆球飛得很高！試著降低一點角度，看看會不會飛得更遠！",
-          };
-        } else {
-          return {
-            type: "SHORT",
-            tLand: tLand,
-            xLand: xLand,
-            msg: "差一點就到圍牆了！試著增加力道，或調整角度！",
-          };
-        }
+      if (btnElement) {
+        btnElement.classList.add('collected');
       }
 
-      // 能抵達全壘打牆水平位置 x = D
-      const tWall = D / vx;
-      const yWall = y0 + vy * tWall - 0.5 * g * tWall * tWall;
+      this.currentInspectedClue = spot;
+      this.showClueCard(spot);
+      this.updateCluesNotebookUI();
+      this.hideGuideToast();
+    }
 
-      if (yWall - r > H) {
-        // 成功飛越全壘打牆
-        return {
-          type: "HOMERUN",
-          tLand: tLand,
-          xLand: xLand,
-          tWall: tWall,
-          yWall: yWall,
-          msg: level.successMsg,
-        };
+    // 顯示線索卡片彈窗
+    showClueCard(spot) {
+      this.dom.cluePartIcon.textContent = spot.icon;
+      this.dom.cluePartName.textContent = spot.name;
+      this.dom.clueDetail.textContent = spot.observation;
+      this.dom.clueMemo.textContent = spot.memo || '記得結合其他部位一起綜合推理喔！';
+      this.dom.cluePopupCard.classList.remove('hidden');
+    }
+
+    hideClueCard() {
+      this.dom.cluePopupCard.classList.add('hidden');
+    }
+
+    // 更新底部偵探筆記本標籤清單
+    updateCluesNotebookUI() {
+      const caseData = CASES_DATA[this.currentCaseIndex];
+      const count = this.collectedClues.size;
+      const total = caseData.hotspots.length;
+
+      this.dom.clueCountNum.textContent = count.toString();
+      this.dom.panelClueStatus.textContent = `已蒐集 ${count}／${total} 個線索`;
+
+      this.dom.cluesTagList.innerHTML = '';
+
+      if (count === 0) {
+        const emptyHint = document.createElement('div');
+        emptyHint.className = 'clue-empty-hint';
+        emptyHint.textContent = '請點擊畫面上貓咪身上的發光光圈，獲取身體語言線索！';
+        this.dom.cluesTagList.appendChild(emptyHint);
       } else {
-        // 抵達牆面時高度不足，撞在牆上
-        return {
-          type: "LOW",
-          tWall: tWall,
-          yWall: Math.max(0, yWall),
-          msg: "球飛得很遠，但高度不夠！試試調整擊球角度！",
-        };
+        caseData.hotspots.forEach((spot) => {
+          if (this.collectedClues.has(spot.id)) {
+            const tag = document.createElement('span');
+            tag.className = 'clue-tag-item';
+            tag.innerHTML = `<span>${spot.icon}</span> <span>${spot.name}</span>`;
+            this.dom.cluesTagList.appendChild(tag);
+          }
+        });
       }
     }
 
-    // 棒球飛行結束後的結算處理
-    onFlightCompleted() {
-      this.flightActive = false;
+    // 觸發推理步驟判斷
+    handleStartDeduction() {
+      const caseData = CASES_DATA[this.currentCaseIndex];
+      const count = this.collectedClues.size;
 
-      if (this.lastResult.type === "HOMERUN") {
-        // 成功擊出全壘打！
-        this.swingPhase = 2; // 慶祝姿勢
-        this.sound.playHomeRun();
-        this.homerunBannerEl.classList.add("active");
-
-        // 全螢幕爆發彩帶
-        this.particles.explodeConfetti(640, 260, 160);
-
-        setTimeout(() => {
-          this.showLevelClearScreen();
-        }, 1800);
-      } else {
-        // 挑戰未成功
-        this.swingPhase = 3; // 懊惱姿勢
-
-        if (this.chancesLeft > 0) {
-          // 仍有機會：顯示氣泡提示，並重新啟用按鈕
-          this.sound.playFail();
-          this.showToast(this.lastResult.msg);
-          setTimeout(() => {
-            this.isSwinging = false;
-            this.swingPhase = 0;
-            this.enableControls(true);
-          }, 1200);
-        } else {
-          // 3 次機會用盡：判定關卡挑戰失敗
-          this.sound.playFail();
-          setTimeout(() => {
-            this.showLevelFailScreen(this.lastResult.msg);
-          }, 1000);
-        }
-      }
-    }
-
-    // 彈出短暫非阻塞提示
-    showToast(msg) {
-      this.toastMsgEl.textContent = msg;
-      this.toastEl.classList.add("show");
-    }
-
-    hideToast() {
-      this.toastEl.classList.remove("show");
-    }
-
-    // 顯示關卡成功結算畫面
-    showLevelClearScreen() {
-      const level = LEVELS[this.currentLevelIndex];
-      this.levelClearTitle.textContent = `第 ${level.id} 關挑戰成功！`;
-      this.levelClearMsg.textContent = level.successMsg;
-      this.levelClearScreen.classList.add("active");
-    }
-
-    // 顯示關卡失敗結算畫面
-    showLevelFailScreen(hint) {
-      this.levelFailHint.textContent = `💡 提示：${hint}`;
-      this.levelFailScreen.classList.add("active");
-    }
-
-    // 顯示最終冠軍畫面
-    showChampionScreen() {
-      this.sound.playChampion();
-      this.particles.explodeConfetti(640, 200, 200);
-      this.championScreen.classList.add("active");
-    }
-
-    // 顯示首頁
-    showStartScreen() {
-      this.startScreen.classList.add("active");
-    }
-
-    // 隱藏所有彈窗
-    hideAllOverlays() {
-      const overlays = document.querySelectorAll(".overlay-screen");
-      overlays.forEach((el) => el.classList.remove("active"));
-    }
-
-    /* ==========================================================================
-       五、 主循環動畫更新與繪製
-       ========================================================================== */
-    loop(currentTime) {
-      const dt = Math.min(0.05, (currentTime - this.lastFrameTime) / 1000.0);
-      this.lastFrameTime = currentTime;
-
-      this.update(dt, currentTime);
-      this.draw();
-
-      requestAnimationFrame((t) => this.loop(t));
-    }
-
-    update(dt, currentTime) {
-      // 1. 雲朵移動
-      this.clouds.forEach((c) => {
-        c.x += c.spd;
-        if (c.x > 1350) c.x = -150;
-      });
-
-      // 2. 揮棒計時更新
-      if (this.swingPhase === 1) {
-        this.batterAnimTimer += dt;
+      // 若未蒐集任何線索，給予溫暖引導提示
+      if (count === 0) {
+        sounds.playWrong();
+        this.showGuideToast('請先點擊貓咪身上的發光部位，至少蒐集 1 個線索再推理喔！');
+        return;
       }
 
-      // 3. 棒球飛行更新
-      if (this.flightActive) {
-        const elapsed = (currentTime - this.flightStartTime) / 1000.0;
-        const res = this.lastResult;
-        const level = LEVELS[this.currentLevelIndex];
-        const g = PHYSICS.g;
+      // 若只蒐集 1 個線索，跳出提示但仍允許繼續
+      if (count === 1) {
+        this.showGuideToast('提示：單一訊號不一定足夠，再多觀察幾個部位，答案會更清楚喔！');
+      }
 
-        if (res.type === "HOMERUN") {
-          // 全壘打：越過牆面，飛行時間至 tLand 後落地
-          if (elapsed >= res.tLand) {
-            this.ball.x = res.xLand;
-            this.ball.y = 0;
-            this.ball.landed = true;
-            this.onFlightCompleted();
-          } else {
-            this.ball.x = this.ball.vx * elapsed;
-            this.ball.y = PHYSICS.y0 + this.ball.vy * elapsed - 0.5 * g * elapsed * elapsed;
-          }
-        } else if (res.type === "LOW") {
-          // 高度不足：抵達牆面時撞牆
-          if (elapsed >= res.tWall) {
-            if (!this.ball.hitWall) {
-              this.ball.hitWall = true;
-              this.sound.playWallHit();
-              const pX = PHYSICS.originX + level.distance * PHYSICS.scale;
-              const pY = PHYSICS.groundY - res.yWall * PHYSICS.scale;
-              this.particles.sparkHit(pX, pY, 18);
-            }
-            // 撞牆後沿著牆面下落
-            const dropTime = elapsed - res.tWall;
-            this.ball.x = level.distance;
-            this.ball.y = Math.max(0, res.yWall - 0.5 * g * dropTime * dropTime * 4);
-            if (this.ball.y <= 0) {
-              this.ball.landed = true;
-              this.onFlightCompleted();
-            }
-          } else {
-            this.ball.x = this.ball.vx * elapsed;
-            this.ball.y = PHYSICS.y0 + this.ball.vy * elapsed - 0.5 * g * elapsed * elapsed;
-          }
-        } else {
-          // 距離不足 (SHORT / HIGH_SHORT)：在牆前落地
-          if (elapsed >= res.tLand) {
-            this.ball.x = res.xLand;
-            this.ball.y = 0;
-            this.ball.landed = true;
-            this.onFlightCompleted();
-          } else {
-            this.ball.x = this.ball.vx * elapsed;
-            this.ball.y = PHYSICS.y0 + this.ball.vy * elapsed - 0.5 * g * elapsed * elapsed;
-          }
-        }
+      this.openEmotionGuessModal();
+    }
 
-        // 記錄軌跡點
-        this.ballPath.push({
-          px: PHYSICS.originX + this.ball.x * PHYSICS.scale,
-          py: PHYSICS.groundY - this.ball.y * PHYSICS.scale,
+    // 開啟步驟一：貓咪心情推理彈窗
+    openEmotionGuessModal() {
+      const caseData = CASES_DATA[this.currentCaseIndex];
+      this.dom.emotionFeedbackBox.classList.add('hidden');
+
+      // 渲染已蒐集線索摘要條
+      this.dom.emotionClueRecap.innerHTML = '';
+      if (this.collectedClues.size > 0) {
+        caseData.hotspots.forEach((spot) => {
+          if (this.collectedClues.has(spot.id)) {
+            const item = document.createElement('span');
+            item.className = 'recap-item';
+            item.textContent = `🔍 ${spot.name}：${spot.meaning}`;
+            this.dom.emotionClueRecap.appendChild(item);
+          }
         });
       }
 
-      // 4. 粒子更新
-      this.particles.update();
-    }
+      // 渲染選項按鈕
+      this.dom.emotionOptionsGroup.innerHTML = '';
+      caseData.emotionQuestion.options.forEach((opt) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'option-btn';
+        btn.innerHTML = `
+          <span class="option-key-badge">${opt.key}</span>
+          <span class="option-text">${opt.text}</span>
+        `;
 
-    /* ==========================================================================
-       六、 Canvas 畫面繪製細節（日系精緻 Q 版棒球風格）
-       ========================================================================== */
-    draw() {
-      const ctx = this.ctx;
-      const level = LEVELS[this.currentLevelIndex];
+        btn.addEventListener('click', () => {
+          this.handleEmotionSelect(opt);
+        });
 
-      // 1. 天空漸層背景
-      const skyGrad = ctx.createLinearGradient(0, 0, 0, PHYSICS.groundY);
-      skyGrad.addColorStop(0, level.skyColor[0]);
-      skyGrad.addColorStop(1, level.skyColor[1]);
-      ctx.fillStyle = skyGrad;
-      ctx.fillRect(0, 0, 1280, 720);
-
-      // 2. 雲朵繪製
-      this.drawClouds(ctx);
-
-      // 3. 觀眾看台與觀眾小人
-      this.drawAudienceStand(ctx);
-
-      // 4. 球場草皮與內野打擊區紅土
-      this.drawField(ctx);
-
-      // 5. 外野全壘打牆（視覺比例精準呈現三關差異）
-      this.drawOutfieldWall(ctx, level);
-
-      // 6. 瞄準方向指示虛線（未揮棒時）
-      if (!this.isSwinging) {
-        this.drawAimGuide(ctx);
-      }
-
-      // 7. Q 版可愛棒球小選手
-      this.drawBatter(ctx);
-
-      // 8. 棒球飛行軌跡
-      this.drawBallPath(ctx);
-
-      // 9. 棒球本體與立體投影
-      this.drawBall(ctx);
-
-      // 10. 粒子特效（彩帶、火花）
-      this.particles.draw(ctx);
-    }
-
-    // 繪製多層次立體蓬鬆白雲
-    drawClouds(ctx) {
-      ctx.save();
-      this.clouds.forEach((c) => {
-        ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, 30 * c.s, 0, Math.PI * 2);
-        ctx.arc(c.x + 25 * c.s, c.y - 12 * c.s, 38 * c.s, 0, Math.PI * 2);
-        ctx.arc(c.x + 55 * c.s, c.y, 28 * c.s, 0, Math.PI * 2);
-        ctx.arc(c.x + 20 * c.s, c.y + 10 * c.s, 24 * c.s, 0, Math.PI * 2);
-        ctx.fill();
+        this.dom.emotionOptionsGroup.appendChild(btn);
       });
-      ctx.restore();
+
+      this.dom.screenEmotion.classList.remove('hidden');
     }
 
-    // 繪製遠景觀眾看台與熱情觀眾
-    drawAudienceStand(ctx) {
-      ctx.save();
-      const standTopY = 320;
-      const standBottomY = 440;
-
-      // 看台斜坡本體
-      const standGrad = ctx.createLinearGradient(0, standTopY, 0, standBottomY);
-      standGrad.addColorStop(0, "#78909c");
-      standGrad.addColorStop(1, "#cfd8dc");
-      ctx.fillStyle = standGrad;
-      ctx.fillRect(0, standTopY, 1280, standBottomY - standTopY);
-
-      // 看台橫條階梯
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-      ctx.lineWidth = 3;
-      for (let y = standTopY + 25; y < standBottomY; y += 30) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(1280, y);
-        ctx.stroke();
-      }
-
-      // 觀眾小人（彩色小頭與擺動加油棒）
-      const colors = ["#e53935", "#1e88e5", "#fdd835", "#43a047", "#8e24aa", "#fb8c00"];
-      for (let i = 0; i < this.audienceCount; i++) {
-        const x = 30 + i * 33;
-        const row = i % 3;
-        const baseY = standTopY + 20 + row * 32;
-        const bob = Math.sin(performance.now() * 0.004 + this.audienceOffsets[i]) * 3;
-        const col = colors[i % colors.length];
-
-        // 身體
-        ctx.fillStyle = col;
-        ctx.beginPath();
-        ctx.arc(x, baseY + bob, 8, 0, Math.PI * 2);
-        ctx.fill();
-
-        // 頭盔或帽子
-        ctx.fillStyle = "#ffffff";
-        ctx.beginPath();
-        ctx.arc(x, baseY + bob - 3, 5, 0, Math.PI, true);
-        ctx.fill();
-
-        // 揮舞的小加油旗
-        if (i % 4 === 0) {
-          ctx.strokeStyle = "#ffeb3b";
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.moveTo(x + 6, baseY + bob);
-          ctx.lineTo(x + 12, baseY + bob - 14);
-          ctx.stroke();
-
-          ctx.fillStyle = "#e53935";
-          ctx.beginPath();
-          ctx.moveTo(x + 12, baseY + bob - 14);
-          ctx.lineTo(x + 22, baseY + bob - 10);
-          ctx.lineTo(x + 12, baseY + bob - 6);
-          ctx.closePath();
-          ctx.fill();
-        }
-      }
-      ctx.restore();
-    }
-
-    // 繪製草坪與內野打擊紅土
-    drawField(ctx) {
-      ctx.save();
-      const groundY = PHYSICS.groundY;
-
-      // 1. 草皮條紋（深淺綠交替）
-      ctx.fillStyle = "#43a047";
-      ctx.fillRect(0, 440, 1280, 280);
-
-      ctx.fillStyle = "rgba(76, 175, 80, 0.4)";
-      for (let x = 0; x < 1280; x += 90) {
-        ctx.fillRect(x, 440, 45, 280);
-      }
-
-      // 2. 本壘板打擊區紅土橢圓
-      ctx.fillStyle = "#bcaaa4";
-      ctx.beginPath();
-      ctx.ellipse(PHYSICS.originX - 10, groundY + 10, 80, 36, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 打擊白線方框
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(PHYSICS.originX - 60, groundY - 14, 50, 44);
-
-      // 本壘板五邊形
-      ctx.fillStyle = "#ffffff";
-      ctx.beginPath();
-      const hx = PHYSICS.originX + 8;
-      const hy = groundY;
-      ctx.moveTo(hx, hy);
-      ctx.lineTo(hx + 14, hy);
-      ctx.lineTo(hx + 14, hy + 10);
-      ctx.lineTo(hx + 7, hy + 18);
-      ctx.lineTo(hx, hy + 10);
-      ctx.closePath();
-      ctx.fill();
-
-      // 草地邊界線
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(hx + 7, hy);
-      ctx.lineTo(1280, hy - 40);
-      ctx.stroke();
-
-      ctx.restore();
-    }
-
-    // 繪製全壘打牆（視覺比例鮮明、包含全壘打黃線與距離標記）
-    drawOutfieldWall(ctx, level) {
-      ctx.save();
-      const wallPixelX = PHYSICS.originX + level.distance * PHYSICS.scale;
-      const wallPixelH = level.height * PHYSICS.scale;
-      const wallTopPixelY = PHYSICS.groundY - wallPixelH;
-      const wallWidth = 24;
-
-      // 牆本體
-      ctx.fillStyle = level.wallColor;
-      ctx.fillRect(wallPixelX, wallTopPixelY, wallWidth, wallPixelH);
-
-      // 牆面立體邊線
-      ctx.strokeStyle = "rgba(0, 0, 0, 0.3)";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(wallPixelX, wallTopPixelY, wallWidth, wallPixelH);
-
-      // 牆頂亮黃色全壘打頂線（Home Run Line）
-      ctx.fillStyle = level.wallTopColor;
-      ctx.fillRect(wallPixelX - 2, wallTopPixelY - 5, wallWidth + 4, 7);
-
-      // 標註高度與距離標牌
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 13px system-ui";
-      ctx.textAlign = "center";
-
-      // 距離標誌牌（例如：75 或 105）
-      ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
-      ctx.fillRect(wallPixelX - 18, PHYSICS.groundY - 35, 60, 24);
-      ctx.fillStyle = "#ffeb3b";
-      ctx.fillText(`${level.distance} M`, wallPixelX + 12, PHYSICS.groundY - 18);
-
-      // 高度標誌牌（如果是巨人高牆，在頂部標示超高高度）
-      if (level.height >= 15) {
-        ctx.fillStyle = "rgba(229, 57, 53, 0.9)";
-        ctx.fillRect(wallPixelX - 24, wallTopPixelY + 12, 72, 22);
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 12px system-ui";
-        ctx.fillText(`高牆 ${level.height} M`, wallPixelX + 12, wallTopPixelY + 28);
-      }
-
-      ctx.restore();
-    }
-
-    // 繪製擊球瞄準輔助虛線
-    drawAimGuide(ctx) {
-      ctx.save();
-      const rad = (this.angle * Math.PI) / 180.0;
-      const len = 90;
-      const startX = PHYSICS.originX - 10;
-      const startY = PHYSICS.groundY - PHYSICS.y0 * PHYSICS.scale - 12;
-      const endX = startX + Math.cos(rad) * len;
-      const endY = startY - Math.sin(rad) * len;
-
-      ctx.setLineDash([6, 4]);
-      ctx.strokeStyle = "rgba(255, 235, 59, 0.9)";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(startX, startY);
-      ctx.lineTo(endX, endY);
-      ctx.stroke();
-
-      // 瞄準箭頭頭部
-      ctx.setLineDash([]);
-      ctx.fillStyle = "#ffca28";
-      ctx.beginPath();
-      ctx.arc(endX, endY, 6, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 顯示角度文字浮水印
-      ctx.font = "bold 13px system-ui";
-      ctx.fillStyle = "#fff8e1";
-      ctx.fillText(`${this.angle}°`, endX + 10, endY - 4);
-
-      ctx.restore();
-    }
-
-    // 繪製 Q 版棒球選手（頭戴帽子、球衣、持棒、多狀態切換）
-    drawBatter(ctx) {
-      ctx.save();
-      const bx = PHYSICS.originX - 35;
-      const by = PHYSICS.groundY - 14;
-
-      // 呼吸律動浮動
-      const idleBob = Math.sin(performance.now() * 0.005) * 2;
-
-      // 1. 雙腳與鞋子
-      ctx.fillStyle = "#ffffff";
-      ctx.strokeStyle = "#37474f";
-      ctx.lineWidth = 2;
-
-      // 左腳
-      ctx.fillRect(bx - 12, by - 12, 10, 16);
-      ctx.fillStyle = "#e53935";
-      ctx.fillRect(bx - 14, by + 4, 14, 6); // 球鞋
-
-      // 右腳
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(bx + 8, by - 12, 10, 16);
-      ctx.fillStyle = "#e53935";
-      ctx.fillRect(bx + 6, by + 4, 14, 6);
-
-      // 2. 身體（球衣）
-      ctx.fillStyle = "#ffffff";
-      ctx.beginPath();
-      ctx.roundRect(bx - 16, by - 44 + idleBob, 36, 34, 8);
-      ctx.fill();
-      ctx.stroke();
-
-      // 球衣號碼條紋
-      ctx.strokeStyle = "#1e88e5";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(bx + 2, by - 40 + idleBob);
-      ctx.lineTo(bx + 2, by - 14 + idleBob);
-      ctx.stroke();
-
-      // 3. 頭部（Q 版大頭圓形）
-      ctx.fillStyle = "#ffe0b2"; // 膚色
-      ctx.beginPath();
-      ctx.arc(bx + 2, by - 60 + idleBob, 18, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "#37474f";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      // 臉部表情
-      ctx.fillStyle = "#37474f";
-      if (this.swingPhase === 2) {
-        // 慶祝大笑 ^_^
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(bx - 3, by - 60 + idleBob, 4, Math.PI, 0);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(bx + 7, by - 60 + idleBob, 4, Math.PI, 0);
-        ctx.stroke();
-        // 微笑大嘴
-        ctx.fillStyle = "#d32f2f";
-        ctx.beginPath();
-        ctx.arc(bx + 2, by - 54 + idleBob, 5, 0, Math.PI);
-        ctx.fill();
-      } else if (this.swingPhase === 3) {
-        // 懊惱 >_<
-        ctx.fillText(">", bx - 7, by - 58 + idleBob);
-        ctx.fillText("<", bx + 3, by - 58 + idleBob);
+    // 處理情緒選擇
+    handleEmotionSelect(selectedOpt) {
+      if (selectedOpt.isCorrect) {
+        sounds.playCorrect();
+        this.dom.screenEmotion.classList.add('hidden');
+        // 進入步驟二：互動選擇
+        this.openActionGuessModal();
       } else {
-        // 專注眼神
-        ctx.beginPath();
-        ctx.arc(bx - 2, by - 60 + idleBob, 3, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(bx + 8, by - 60 + idleBob, 3, 0, Math.PI * 2);
-        ctx.fill();
-        // 腮紅
-        ctx.fillStyle = "rgba(255, 138, 128, 0.6)";
-        ctx.beginPath();
-        ctx.arc(bx - 6, by - 54 + idleBob, 3, 0, Math.PI * 2);
-        ctx.arc(bx + 12, by - 54 + idleBob, 3, 0, Math.PI * 2);
-        ctx.fill();
+        sounds.playWrong();
+        this.dom.emotionFeedbackText.textContent = selectedOpt.hint || '再想想看！單看一個部位可能不夠，要把耳朵、尾巴和身體姿勢一起看喔！';
+        this.dom.emotionFeedbackBox.classList.remove('hidden');
       }
-
-      // 4. 棒球帽
-      ctx.fillStyle = "#1565c0";
-      ctx.beginPath();
-      ctx.arc(bx + 2, by - 64 + idleBob, 18, Math.PI, 0);
-      ctx.fill();
-
-      // 帽簷
-      ctx.fillStyle = "#0d47a1";
-      ctx.beginPath();
-      ctx.ellipse(bx + 12, by - 64 + idleBob, 14, 5, 0.1, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 5. 木質球棒與雙手揮動
-      ctx.save();
-      ctx.translate(bx + 6, by - 36 + idleBob);
-
-      let batAngle = -0.6; // 預設斜後舉起
-      if (this.swingPhase === 1) {
-        // 揮棒中：0.35 秒內快速劃出一道圓弧
-        const prog = Math.min(1.0, this.batterAnimTimer / 0.35);
-        batAngle = -0.8 + prog * 2.2;
-      } else if (this.swingPhase === 2) {
-        // 慶祝時高舉球棒！
-        batAngle = -1.9;
-      }
-
-      ctx.rotate(batAngle);
-
-      // 球棒本體
-      ctx.fillStyle = "#d7ccc8";
-      ctx.fillRect(-3, -48, 7, 44);
-      ctx.fillStyle = "#8d6e63"; // 棒頭加粗
-      ctx.fillRect(-4, -48, 9, 20);
-      // 球棒握把布
-      ctx.fillStyle = "#3e2723";
-      ctx.fillRect(-2, -14, 5, 12);
-
-      ctx.restore();
-
-      ctx.restore();
     }
 
-    // 繪製棒球飛行軌跡（淡藍色光芒軌跡帶）
-    drawBallPath(ctx) {
-      if (this.ballPath.length < 2) return;
-      ctx.save();
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
-      ctx.lineWidth = 3;
-      ctx.setLineDash([4, 4]);
+    // 開啟步驟二：適當互動方式選擇彈窗
+    openActionGuessModal() {
+      const caseData = CASES_DATA[this.currentCaseIndex];
+      this.dom.actionFeedbackBox.classList.add('hidden');
+      this.dom.confirmedEmotionBadge.innerHTML = `<span>✅ 貓咪心情確認：<strong>${caseData.actionQuestion.confirmedText}</strong></span>`;
 
-      ctx.beginPath();
-      ctx.moveTo(this.ballPath[0].px, this.ballPath[0].py);
-      for (let i = 1; i < this.ballPath.length; i++) {
-        ctx.lineTo(this.ballPath[i].px, this.ballPath[i].py);
-      }
-      ctx.stroke();
-      ctx.restore();
+      this.dom.actionOptionsGroup.innerHTML = '';
+      caseData.actionQuestion.options.forEach((opt) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'option-btn';
+        btn.innerHTML = `
+          <span class="option-key-badge">${opt.key}</span>
+          <span class="option-text">${opt.text}</span>
+        `;
+
+        btn.addEventListener('click', () => {
+          this.handleActionSelect(opt);
+        });
+
+        this.dom.actionOptionsGroup.appendChild(btn);
+      });
+
+      this.dom.screenAction.classList.remove('hidden');
     }
 
-    // 繪製棒球本體與地面陰影
-    drawBall(ctx) {
-      ctx.save();
-      const px = PHYSICS.originX + this.ball.x * PHYSICS.scale;
-      const py = PHYSICS.groundY - this.ball.y * PHYSICS.scale;
-      const groundShadowY = PHYSICS.groundY;
+    // 處理互動選擇
+    handleActionSelect(selectedOpt) {
+      if (selectedOpt.isCorrect) {
+        sounds.playCorrect();
+        this.dom.screenAction.classList.add('hidden');
+        // 顯示單關破案結果
+        this.showCaseSuccessModal();
+      } else {
+        sounds.playWrong();
+        this.dom.actionFeedbackText.textContent = selectedOpt.hint || '請選擇最安全且尊重貓咪感受的做法喔！';
+        this.dom.actionFeedbackBox.classList.remove('hidden');
+      }
+    }
 
-      // 1. 地面投射陰影（高度越高陰影越淡越小）
-      const heightAboveGround = Math.max(0, this.ball.y);
-      const shadowAlpha = Math.max(0.08, 0.35 - heightAboveGround * 0.015);
-      const shadowSize = Math.max(3, 8 - heightAboveGround * 0.2);
+    // 顯示單關破案成功視窗
+    showCaseSuccessModal() {
+      const caseData = CASES_DATA[this.currentCaseIndex];
+      this.dom.successCaseName.textContent = caseData.title;
+      this.dom.successExpClues.textContent = caseData.summary.clues;
+      this.dom.successExpEducation.textContent = caseData.summary.education;
 
-      ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
-      ctx.beginPath();
-      ctx.ellipse(px, groundShadowY + 2, shadowSize * 1.5, shadowSize * 0.6, 0, 0, Math.PI * 2);
-      ctx.fill();
+      if (this.currentCaseIndex === CASES_DATA.length - 1) {
+        this.dom.btnNextCaseText.textContent = '查看特級偵探結算證書 🏆';
+      } else {
+        this.dom.btnNextCaseText.textContent = '前往下一個委託案件 🐾';
+      }
 
-      // 2. 棒球球體
-      const r = 7;
-      ctx.fillStyle = "#ffffff";
-      ctx.beginPath();
-      ctx.arc(px, py, r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "#e53935";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
+      this.dom.screenSuccess.classList.remove('hidden');
+    }
 
-      // 棒球紅色縫線弧度
-      ctx.beginPath();
-      ctx.arc(px - 2, py, 4, -Math.PI / 2, Math.PI / 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(px + 2, py, 4, Math.PI / 2, -Math.PI / 2);
-      ctx.stroke();
+    // 顯示最終全通關證書畫面
+    showCompleteScreen() {
+      sounds.playFanfare();
+      this.hideAllScreens();
+      this.dom.screenComplete.classList.remove('hidden');
+    }
 
-      ctx.restore();
+    // 浮動導引氣泡小提示
+    showGuideToast(msg) {
+      this.dom.guideTooltipText.textContent = msg;
+      this.dom.guideTooltip.classList.remove('hidden');
+    }
+
+    hideGuideToast() {
+      this.dom.guideTooltip.classList.add('hidden');
+    }
+
+    // 閒置計時器（若玩家太久沒動作，自動跳出友善引導）
+    resetIdleTimer() {
+      if (this.idleTimer) {
+        clearTimeout(this.idleTimer);
+      }
+
+      this.idleTimer = setTimeout(() => {
+        // 僅在進行案件觀察且未開啟任何模態視窗時提示
+        const isObserving = this.dom.screenStart.classList.contains('hidden') &&
+                            this.dom.screenEmotion.classList.contains('hidden') &&
+                            this.dom.screenAction.classList.contains('hidden') &&
+                            this.dom.screenSuccess.classList.contains('hidden') &&
+                            this.dom.screenComplete.classList.contains('hidden') &&
+                            this.dom.cluePopupCard.classList.contains('hidden');
+
+        if (isObserving) {
+          if (this.collectedClues.size === 0) {
+            this.showGuideToast('💡 先點擊貓咪身上發光的部位找線索！');
+          } else if (this.collectedClues.size < 3) {
+            this.showGuideToast('💡 再多觀察幾個部位，線索會更齊全喔！');
+          } else {
+            this.showGuideToast('💡 線索收集齊全了！點擊右下角「我知道了！」開始推理！');
+          }
+        }
+      }, this.idleReminderSeconds * 1000);
     }
   }
 
-  // 視窗載入完成後啟動遊戲
-  window.addEventListener("DOMContentLoaded", () => {
-    window.gameInstance = new HomeRunGame();
+  // DOM 載入後啟動遊戲
+  document.addEventListener('DOMContentLoaded', () => {
+    window.catDetectiveApp = new CatDetectiveGame();
   });
+
 })();
